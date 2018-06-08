@@ -35,3 +35,6 @@
 #include <stdlib.h>
 #include <gst/base/gstbitreader.h>
 #include "gstav1parser.h"
+
+#define gst_av1_read_bit(br) gst_bit_reader_get_bits_uint8_unchecked(br, 1)
+#define gst_av_read_bits(br, bits) gst_bit_reader_get_bits_uint32_unchecked(br, bits)
