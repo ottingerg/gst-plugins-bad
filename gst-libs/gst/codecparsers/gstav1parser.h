@@ -37,6 +37,66 @@ G_BEGIN_DECLS
 #define GST_AV1_MAX_DECODER_MODEL_OPERATING_POINTS 32
 
 /**
+ * GstAV1OBUType:
+ *
+ */
+
+typedef enum {
+  GST_AV1_OBU_RESERVED_0 = 0,
+  GST_AV1_OBU_SEQUENCE_HEADER = 1,
+  GST_AV1_OBU_TEMPORAL_DELIMITER = 2,
+  GST_AV1_OBU_FRAME_HEADER = 3,
+  GST_AV1_OBU_TILE_GROUP = 4,
+  GST_AV1_OBU_METADATA = 5,
+  GST_AV1_OBU_FRAME = 6,
+  GST_AV1_OBU_REDUNDANT_FRAME_HEADER = 7,
+  GST_AV1_OBU_TILE_LIST = 8,
+  GST_AV1_OBU_RESERVED_9 = 9,
+  GST_AV1_OBU_RESERVED_10 = 10,
+  GST_AV1_OBU_RESERVED_11 = 11,
+  GST_AV1_OBU_RESERVED_12 = 12,
+  GST_AV1_OBU_RESERVED_13 = 13,
+  GST_AV1_OBU_RESERVED_14 = 14,
+  GST_AV1_OBU_PADDING = 15,
+} GstAV1OBUType;
+
+/**
+ * GstAV1MetadataType:
+ *
+ */
+
+typedef enum {
+  GST_AV1_METADATA_TYPE_RESERVED_0 = 0,
+  GST_AV1_METADATA_TYPE_HDR_CLL = 1,
+  GST_AV1_METADATA_TYPE_HDR_MDCV = 2,
+  GST_AV1_METADATA_TYPE_GST_AV1_SCALABILITY = 3,
+  GST_AV1_METADATA_TYPE_ITUT_T35 = 4,
+  GST_AV1_METADATA_TYPE_TIMECODE = 5,
+} GstAV1MetadataType;
+
+/**
+ * GstAV1ScalabilityModes:
+ *
+ */
+typedef enum {
+  GST_AV1_SCALABILITY_L1T2 = 0,
+  GST_AV1_SCALABILITY_L1T3 = 1,
+  GST_AV1_SCALABILITY_L2T1 = 2,
+  GST_AV1_SCALABILITY_L2T2 = 3,
+  GST_AV1_SCALABILITY_L2T3 = 4,
+  GST_AV1_SCALABILITY_S2T1 = 5,
+  GST_AV1_SCALABILITY_S2T2 = 6,
+  GST_AV1_SCALABILITY_S2T3 = 7
+  GST_AV1_SCALABILITY_L2T1h = 8
+  GST_AV1_SCALABILITY_L2T2h = 9
+  GST_AV1_SCALABILITY_L2T3h =10
+  GST_AV1_SCALABILITY_S2T1h = 11
+  GST_AV1_SCALABILITY_S2T2h = 12
+  GST_AV1_SCALABILITY_S2T3h = 13
+  GST_AV1_SCALABILITY_SS = 14,
+} GstAV1ScalabilityModes;
+
+/**
  * GstAV1ColorPrimaries:
  * GST_AV1_CP_BT_709: BT.709
  * GST_AV1_CP_UNSPECIFIED: Unspecified
@@ -151,6 +211,25 @@ typedef enum {
   GST_AV1_MC_CHROMAT_CL = 13,
   GST_AV1_MC_ICTCP = 14,
 } GstAV1MatrixCoefficients;
+
+
+/**
+ * GstAV1ChromaSamplePositions:
+ * GST_AV1_CSP_UNKNOWN: Unknown (in this case the source video transfer function must be
+ *                      signaled outside the AV1 bitstream).
+ * GST_AV1_CSP_VERTICAL: Horizontally co-located with (0, 0) luma sample, vertical position in
+ *                       the middle between two luma samples.
+ * GST_AV1_CSP_COLOCATED: co-located with (0, 0) luma sample.
+ * GST_AV1_CSP_RESERVED: For future use.
+ *
+ */
+
+typedef enum {
+  GST_AV1_CSP_UNKNOWN = 0,
+  GST_AV1_CSP_VERTICAL = 1,
+  GST_AV1_CSP_COLOCATED = 2,
+  GST_AV1_CSP_RESERVED = 3,
+} GstAV1ChromaSamplePositions;
 
 /**
  * _GstAV1OperatingPoints:
@@ -270,7 +349,7 @@ struct _GstAV1ColorConfig {
   guint8 color_range;
   guint8 subsampling_x;
   guint8 subsampling_y;
-  GstAV1ChromaSamplePosition chroma_sample_position;
+  GstAV1ChromaSamplePositions chroma_sample_position;
   guint8 separate_uv_delta_q;
 }
 
@@ -393,6 +472,140 @@ struct _GstAV1SequenceHeaderOBU {
 
   GstAV1ColorConfig color_config;
 };
+
+/**
+ * _GstAV1MetadataITUT_T35:
+ *
+ * @itu_t_t35_country_code: shall be a byte having a value specified as a country code by Annex A of Recommendation ITU-T T.35.
+ * @itu_t_t35_country_code_extension_byte: shall be a byte having a value specified as a country code by Annex B of
+ *                                         Recommendation ITU-T T.35.
+ * @itu_t_t35_payload_bytes: shall be bytes containing data registered as specified in Recommendation ITU-T T.35.
+ */
+struct _GstAV1MetadataITUT_T35 {
+  guint8 itu_t_t35_country_code;
+  guint8 itu_t_t35_country_code_extention_byte
+  // itu_t_t35_payload_bytes - not supported at the moment
+};
+
+/**
+ * _GstAV1MetadataHdrCll:
+ * high dynamic range content light level syntax metadata
+ *
+ * @max_cll: specifies the maximum content light level as specified in CEA-861.3, Appendix A.
+ * @max_fall: specifies the maximum frame-average light level as specified in CEA-861.3, Appendix A.
+ *
+ */
+
+struct _GstAV1MetadataHdrCll {
+  guint16 max_cll;
+  guint16 max_fall;
+};
+
+/**
+ * _GstAV1MetadataHdrCll:
+ * high dynamic range mastering display color volume metadata
+ *
+ * @primary_chromaticity_x[]: specifies a 0.16 fixed-point X chromaticity coordinate as defined by CIE 1931, where i =
+ *                            0,1,2 specifies Red, Green, Blue respectively.
+ * @primary_chromaticity_y[]: specifies a 0.16 fixed-point Y chromaticity coordinate as defined by CIE 1931, where i =
+ *                            0,1,2 specifies Red, Green, Blue respectively.
+ * @white_point_chromaticity_x: specifies a 0.16 fixed-point white X chromaticity coordinate as defined by CIE 1931.
+ * @white_point_chromaticity_y: specifies a 0.16 fixed-point white Y chromaticity coordinate as defined by CIE 1931.
+ * @luminance_max: is a 24.8 fixed-point maximum luminance, represented in candelas per square meter.
+ * @luminance_min: is a 18.14 fixed-point minimum luminance, represented in candelas per square meter.
+ */
+
+struct _GstAV1MetadataHdrMdcv {
+  guint16 primary_chromaticity_x[4];
+  guint16 primary_chromaticity_y[4];
+  guint16 white_point_chromaticity_x;
+  guint16 white_point_chromaticity_y;
+  guint32 luminance_max;
+  guint32 luminance_min;
+};
+
+/**
+ * _GstAV1MetadataScalability:
+ * high dynamic range mastering display color volume metadata
+ *
+ * @scalability_mode_idc: indicates the picture prediction structure of the bitstream.
+ * @spatial_layers_cnt_minus_1: indicates the number of spatial layers present in the video sequence minus one.
+ * @spatial_layer_description_present_flag: indicates when set to 1 that the spatial_layer_ref_id is present for each of the
+ *                                          (spatial_layers_cnt_minus_1 + 1) layers, or that it is not present when set to 0.
+ * @spatial_layer_dimensions_present_flag: indicates when set to 1 that the spatial_layer_max_width and
+ *                                         spatial_layer_max_height parameters are present for each of the
+ *                                         (spatial_layers_cnt_minus_1 + 1) layers, or that it they are not present when set to 0.
+ * @temporal_group_description_present_flag: indicates when set to 1 that the temporal dependency information is
+ *                                           present, or that it is not when set to 0.
+ *
+ * @scalability_structure_reserved_3bits: must be set to zero and be ignored by decoders.
+ * @spatial_layer_max_width[i]: specifies the maximum frame width for the frames with spatial_id equal to i. This number
+ *                              must not be larger than max_frame_width_minus_1 + 1.
+ * @spatial_layer_max_height[i]: specifies the maximum frame height for the frames with spatial_id equal to i. This number
+ *                               must not be larger than max_frame_height_minus_1 + 1.
+ * @spatial_layer_ref_id[i]: specifies the spatial_id value of the frame within the current temporal unit that the frame of layer i
+ *                           uses for reference. If no frame within the current temporal unit is used for reference the value must
+ *                           be equal to 255.
+ * @temporal_group_size: indicates the number of pictures in a temporal picture group. If the temporal_group_size is greater
+ *                       than 0, then the scalability structure data allows the inter-picture temporal dependency structure of
+ *                       the video sequence to be specified. If the temporal_group_size is greater than 0, then for temporal_group_size
+ *                       pictures in the temporal group, each picture’s temporal layer id (temporal_id), switch up points
+ *                       (temporal_group_temporal_switching_up_point_flag and temporal_group_spatial_switching_up_point_flag), and the
+ *                       reference picture indices (temporal_group_ref_pic_diff) are specified.
+ *                       The first picture specified in a temporal group must have temporal_id equal to 0.
+ *                       If the parameter temporal_group_size is not present or set to 0, then either there is only one temporal layer
+ *                       or there is no fixed inter-picture temporal dependency present going forward in the video sequence.
+ *                       Note that for a given picture, all frames follow the same inter-picture temporal dependency structure.
+ *                       However, the frame rate of each layer can be different from each other. The specified dependency structure
+ *                       in the scalability structure data must be for the highest frame rate layer.
+ * @temporal_group_temporal_id[i]: specifies the temporal_id value for the i-th picture in the temporal group.
+ * @temporal_group_temporal_switching_up_point_flag[i]: is set to 1 if subsequent (in decoding order) pictures with a temporal_id higher
+ *                                                      than temporal_group_temporal_id[ i ] do not depend on any picture preceding the
+ *                                                      current picture (in coding order) with temporal_id higher than
+ *                                                      temporal_group_temporal_id[ i ].
+ * @temporal_group_spatial_switching_up_point_flag[i]: is set to 1 if spatial layers of the current picture in the temporal group
+ *                                                     (i.e., pictures with a spatial_id higher than zero) do not depend on any picture
+ *                                                     preceding the current picture in the temporal group.
+ * @temporal_group_ref_cnt[i]: indicates the number of reference pictures used by the i-th picture in the temporal group.
+ * @temporal_group_ref_pic_diff[i][j]: indicates, for the i-th picture in the temporal group, the temporal distance between the i-th picture
+ *                                     and the j-th reference picture used by the i-th picture. The temporal distance is measured in frames,
+ *                                     counting only frames of identical spatial_id values.
+ */
+
+#define GST_AV1_MAX_SPATIAL_LAYERS 2 //is this correct??
+#define GST_AV1_MAX_TEMPORAL_GROUP_SIZE 8 //is this correct??
+#define GST_AV1_MAX_TEMPORAL_GROUP_REFERENCES 8 //is this correct??
+
+struct _GstAV1MetadataScalability {
+  GstAV1ScalabilityModes scalability_mode_idc;
+  guint8 spatial_layers_cnt_minus_1;
+  guint8 spatial_layer_dimensions_present_flag;
+  guint8 spatial_layer_description_present_flag;
+  guint8 temporal_group_description_present_flag;
+  guint8 scalability_structure_reserved_3bits;
+  guint16 spatial_layer_max_width[GST_AV1_MAX_SPATIAL_LAYERS];
+  guint16 spatial_layer_max_height[GST_AV1_MAX_SPATIAL_LAYERS];
+  guint8 spatial_layer_ref_id[GST_AV1_MAX_SPATIAL_LAYERS];
+  guint8 temporal_group_size;
+
+  guint8 temporal_group_temporal_id[GST_AV1_MAX_TEMPORAL_GROUP_SIZE];
+  guint8 temporal_group_temporal_switching_up_point_flag[GST_AV1_MAX_TEMPORAL_GROUP_SIZE];
+  guint8 temporal_group_spatial_switching_up_point_flag[GST_AV1_MAX_TEMPORAL_GROUP_SIZE];
+  guint8 temporal_group_ref_cnt[GST_AV1_MAX_TEMPORAL_GROUP_SIZE];
+  guint8 temporal_group_ref_pic_diff[GST_AV1_MAX_TEMPORAL_GROUP_SIZE][GST_AV1_MAX_TEMPORAL_GROUP_REFERENCES];
+};
+
+/**
+ * _GstAV1MetadataOBU:
+ *
+ * @metadata_type
+ */
+
+struct _GstAV1MetadataOBU {
+  guint32 metadata_type;
+
+
+}
 
 GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
