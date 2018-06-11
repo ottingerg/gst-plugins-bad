@@ -19,6 +19,20 @@
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
+/*
+ * Description texts for syntax elements are taken from
+ * the AV1 Bitstream & Decoding Process Specification
+ */
+ /**
+  * SECTION:gstav1parser
+  * @title: GstAV1Parser
+  * @short_description: Convenience library for parsing AV1 video bitstream.
+  *
+  * For more details about the structures, you can refer to the
+  * specifications: https://aomediacodec.github.io/av1-spec/av1-spec.pdf
+  *
+  */
+
 
 #ifndef GST_AV1_PARSER_H
 #define GST_AV1_PARSER_H
@@ -230,6 +244,30 @@ typedef enum {
   GST_AV1_CSP_COLOCATED = 2,
   GST_AV1_CSP_RESERVED = 3,
 } GstAV1ChromaSamplePositions;
+
+/**
+ * GstAV1FrameType:
+ *
+ */
+typedef enum {
+  GST_AV1_KEY_FRAME = 0,
+  GST_AV1_INTER_FRAME = 1,
+  GST_AV1_INTRA_ONLY_FRAME = 2,
+  GST_AV1_SWITCH_FRAME = 3,
+} GstAV1FrameType;
+
+/**
+ * GstAV1InterpolationFilter:
+ *
+ */
+typedef enum {
+  GST_AV1_INTERPOLATION_FILTER_EIGHTTAP = 0,
+  GST_AV1_INTERPOLATIONG_FILTER_EIGHTTAP_SMOOTH = 1,
+  GST_AV1_INTERPOLATIONG_FILTER_EIGHTTAP_SHARP = 2,
+  GST_AV1_INTERPOLATIONG_FILTER_BILINEAR = 3,
+  GST_AV1_INTERPOLATIONG_FILTER_SWITCHABLE = 4,
+} GstAV1InterpolationFilter;
+
 
 /**
  * _GstAV1OperatingPoints:
@@ -595,17 +633,332 @@ struct _GstAV1MetadataScalability {
   guint8 temporal_group_ref_pic_diff[GST_AV1_MAX_TEMPORAL_GROUP_SIZE][GST_AV1_MAX_TEMPORAL_GROUP_REFERENCES];
 };
 
+
+/**
+ * _GstAV1MetadataTimecode:
+ * high dynamic range mastering display color volume metadata
+ *
+ * @counting_type: specifies the method of dropping values of the n_frames syntax element as specified in AV1 Spec 6.1.1.
+ *                 counting_type should be the same for all pictures in the coded video sequence.
+ * @full_timestamp_flag: equal to 1 indicates that the the seconds_value, minutes_value, hours_value syntax elements will be
+ *                       present. full_timestamp_flag equal to 0 indicates that there are flags to control the presence of
+ *                       these syntax elements.
+ * @discontinuity_flag: equal to 0 indicates that the difference between the current value of clockTimestamp and the value of
+ *                      clockTimestamp computed from the previous set of timestamp syntax elements in output order can be
+ *                      interpreted as the time difference between the times of origin or capture of the associated frames or
+ *                      fields. discontinuity_flag equal to 1 indicates that the difference between the current value of
+ *                      clockTimestamp and the value of clockTimestamp computed from the previous set of clock timestamp syntax
+ *                      elements in output order should not be interpreted as the time difference between the times of origin
+ *                      or capture of the associated frames or fields.
+ * @cnt_dropped_flag: specifies the skipping of one or more values of n_frames using the counting method specified by
+ *                    counting_type.
+ * @n_frames: is used to compute clockTimestamp. When timing_info_present_flag is equal to 1, n_frames shall be less than
+ *            maxFps, where maxFps is specified by maxFps = ceil( time_scale / ( 2 * num_units_in_display_tick ) ).
+ * @seconds_flag equal: to 1 specifies that seconds_value and minutes_flag are present when full_timestamp_flag is equal to
+ *                      0. seconds_flag equal to 0 specifies that seconds_value and minutes_flag are not present.
+ * @seconds_value: is used to compute clockTimestamp and shall be in the range of 0 to 59. When seconds_value is not
+ *                 present, its value is inferred to be equal to the value of seconds_value for the previous set of clock
+ *                 timestamp syntax elements in decoding order, and it is required that such a previous seconds_value shall
+ *                 have been present.
+ * @minutes_flag equal: to 1 specifies that minutes_value and hours_flag are present when full_timestamp_flag is equal to 0
+ *                      and seconds_flag is equal to 1. minutes_flag equal to 0 specifies that minutes_value and hours_flag
+ *                      are not present.
+ * @minutes_value specifies: the value of mm used to compute clockTimestamp and shall be in the range of 0 to 59, inclusive.
+ *                           When minutes_value is not present, its value is inferred to be equal to the value of minutes_value
+ *                           for the previous set of clock timestamp syntax elements in decoding order, and it is required that
+ *                           such a previous minutes_value shall have been present.
+ * @hours_flag: equal to 1 specifies that hours_value is present when full_timestamp_flag is equal to 0 and seconds_flag is
+ *              equal to 1 and minutes_flag is equal to 1.
+ * @hours_value: is used to compute clockTimestamp and shall be in the range of 0 to 23, inclusive. When hours_value is not
+ *               present, its value is inferred to be equal to the value of hours_value for the previous set of clock timestamp
+ *               syntax elements in decoding order, and it is required that such a previous hours_value shall have been present.
+ * @time_offset_length: greater than 0 specifies the length in bits of the time_offset_value syntax element. time_offset_length
+ *                      equal to 0 specifies that the time_offset_value syntax element is not present. time_offset_length should
+ *                      be the same for all pictures in the coded video sequence.
+ * @time_offset_value: is used to compute clockTimestamp. The number of bits used to represent time_offset_value is equal to
+ *                     time_offset_length. When time_offset_value is not present, its value is inferred to be equal to 0.
+ *
+ */
+
+struct _GstAV1MetadataTimecode {
+  guint8 counting_type; // candidate for sperate Type GstAV1TimecodeCountingType
+  guint8 full_timestamp_flag;
+  guint8 discontinuity_flag;
+  guint8 cnt_dropped_flag;
+  guint8 n_frames;
+  guint8 seconds_flag;
+  guint8 seconds_value;
+  guint8 minutes_flag;
+  guint8 minutes_value;
+  guint8 hours_flag;
+  guint8 hours_value;
+  guint8 time_offset_length;
+  guint32 time_offset_value;
+}:
+
 /**
  * _GstAV1MetadataOBU:
  *
- * @metadata_type
+ * @metadata_type: type of metadata
+ * @itut_t35: ITUT T35 metadata
+ * @hdrcll: high dynamic range content light level metadata
+ * @hdrcmdcv: high dynamic range mastering display color volume metadata_type
+ * @scalability: Scalability metadata
+ * @timecode: Timecode metadata
  */
 
 struct _GstAV1MetadataOBU {
-  guint32 metadata_type;
+  GstAV1MetadataType metadata_type;
 
+  GstAV1MetadataITUT_T35 itut_t35;
+  GstAV1MetadataHdrCll hdrcll;
+  GstAV1MetadataHdrMdcv hdrcmdcv;
+  GstAV1MetadataScalability scalability;
+  GstAV1MetadataTimecode timecode;
+};
 
-}
+/**
+ * _GstAV1LoopFilterParams:
+ *
+ * @loop_filter_level[]: is an array containing loop filter strength values. Different loop filter strength values
+ *                       from the array are used depending on the image plane being filtered, and the edge direction
+ *                       (vertical or horizontal) being filtered.
+ * @loop_filter_sharpness: indicates the sharpness level. The loop_filter_level and loop_filter_sharpness together
+ *                         determine when a block edge is filtered, and by how much the filtering can change the
+ *                         sample values. The loop filter process is described in AV1 Bitstream Spec. section 7.14.
+ * @loop_filter_delta_enabled: equal to 1 means that the filter level depends on the mode and reference frame used to
+ *                             predict a block. loop_filter_delta_enabled equal to 0 means that the filter level does
+ *                             not depend on the mode and reference frame.
+ * @loop_filter_delta_update: equal to 1 means that the bitstream contains additional syntax elements that specify which
+ *                            mode and reference frame deltas are to be updated. loop_filter_delta_update equal to 0
+ *                            means that these syntax elements are not present
+ * @update_ref_delta[]: equal to 1 means that the bitstream contains the syntax element loop_filter_ref_delta;
+ *                      update_ref_delta equal to 0 means that the bitstream does not contain this syntax element.
+ * @loop_filter_ref_deltas[]: contains the adjustment needed for the filter level based on the chosen reference frame.
+ *                            If this syntax element is not present in the bitstream, it maintains its previous value.
+ * @update_mode_delta[]: equal to 1 means that the bitstream contains the syntax element loop_filter_mode_deltas;
+ *                       update_mode_delta equal to 0 means that the bitstream does not contain this syntax element.
+ * @loop_filter_mode_deltas[]: contains the adjustment needed for the filter level based on the chosen mode. If this syntax
+ *                             element is not present in the bitstream, it maintains its previous value.
+ *
+ */
+
+#define GST_AV1_TOTAL_REFS_PER_FRAME 8
+struct _GstAV1LoopFilterParams {
+  guint8 loop_filter_level[4]; //is 4 fixed??
+  guint8 loop_filter_sharpness;
+  guint8 loop_filter_delta_enable;
+  guint8 loop_filter_delta_update;
+
+  guint8 update_ref_deltas[GST_AV1_TOTAL_REFS_PER_FRAME];
+  guint8 loop_filter_ref_deltas[GST_AV1_TOTAL_REFS_PER_FRAME];
+
+  guint8 update_mode_deltas[2]; // is 2 fixed?
+  guint8 loop_filter_mode_deltas[2];
+
+};
+
+/**
+ * _GstAV1QuantizationParams:
+ *
+ * @base_q_idx: indicates the base frame qindex. This is used for Y AC coefficients and as the base value for
+ *              the other quantizers.
+ * @DeltaQYDc: indicates the Y DC quantizer relative to base_q_idx.
+ * @diff_uv_delta: equal to 1 indicates that the U and V delta quantizer values are coded separately. diff_uv_delta
+ *                 equal to 0 indicates that the U and V delta quantizer values share a common value.
+ * @DeltaQUDc: indicates the U DC quantizer relative to base_q_idx.
+ * @DeltaQUAc: indicates the U AC quantizer relative to base_q_idx.
+ * @DeltaQVAc: indicates the V AC quantizer relative to base_q_idx.
+ * @using_qmatrix: specifies that the quantizer matrix will be used to compute quantizers.
+ * @qm_y: specifies the level in the quantizer matrix that should be used for luma plane decoding.
+ * @qm_u: specifies the level in the quantizer matrix that should be used for chroma U plane decoding.
+ * @qm_v: specifies the level in the quantizer matrix that should be used for chroma V plane decoding.
+ */
+struct _GstAV1QuantizationParams {
+  guint8 base_q_idx;
+  guint8 DeltaQYDc;
+  guint8 diff_uv_delta;
+  guint8 DeltaQUDc;
+  guint8 DeltaQUAc;
+  guint8 DeltaQVDc;
+  guint8 DeltaQVAc;
+  guint8 using_qmatrix;
+  guint8 qm_y;
+  guint8 qm_u;
+  guint8 qm_v;
+};
+
+/**
+ * _GstAV1SegmenationParams:
+ *
+ * @segmentation_enabled: equal to 1 indicates that this frame makes use of the segmentation tool;
+ *                        segmentation_enabled equal to 0 indicates that the frame does not use segmentation.
+ * @segmentation_update_map: equal to 1 indicates that the segmentation map are updated during the decoding
+ *                           of this frame. segmentation_update_map equal to 0 means that the segmentation map
+ *                           from the previous frame is used.
+ * @segmentation_temporal_update: equal to 1 indicates that the updates to the segmentation map are coded relative to
+ *                                the existing segmentation map. segmentation_temporal_update equal to 0 indicates that
+ *                                the new segmentation map is coded without reference to the existing segmentation map.
+ * @segmentation_update_data: equal to 1 indicates that new parameters are about to be specified for each segment.
+ *                            segmentation_update_data equal to 0 indicates that the segmentation parameters should keep
+ *                            their existing values.
+ * @FeatureEnabled[]: equal to 0 indicates that the corresponding feature is unused and has value equal to 0.
+ *                    FeatureEnabled[] equal to 1 indicates that the feature value is coded in the bitstream.
+ * @FeatureValue[]: specifies the feature data for a segment feature.
+ *
+ */
+
+#define GST_AV1_MAX_SEGMENTS 8
+#define GST_AV1_SEG_LVL_MAX 8
+struct _GstAV1SegmenationParams {
+  guint8 segmentation_enabled;
+  guint8 segmentation_update_map;
+  guint8 segmentation_temporal_update;
+  guint8 segmentation_update_data;
+  guint8 FeatureEnabled[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
+  guint8 FeatureData[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
+};
+
+/**
+ * _GstAV1MetadataOBU:
+ *
+ * @show_existing_frame: equal to 1, indicates the frame indexed by frame_to_show_map_idx is to be output;
+ *                       show_existing_frame equal to 0 indicates that further processing is required.
+ *                       If obu_type is equal to OBU_FRAME, it is a requirement of bitstream conformance
+ *                       that show_existing_frame is equal to 0.
+ * @frame_to_show_map_idx: specifies the frame to be output. It is only available if show_existing_frame is 1.
+ * @display_frame_id provides: the frame id number for the frame to output. It is a requirement of bitstream conformance
+ *                             that whenever display_frame_id is read, the value matches RefFrameId[ frame_to_show_map_idx ]
+ *                             (the value of current_frame_id at the time that the frame indexed by frame_to_show_map_idx was
+ *                             stored), and that RefValid[ frame_to_show_map_idx ] is equal to 1.
+ *                             It is a requirement of bitstream conformance that the number of bits needed to read
+ *                             display_frame_id does not exceed 16. This is equivalent to the constraint that idLen <= 16
+ * @frame_type: specifies the type of the frame.
+ * @show_frame: equal to 1 specifies that this frame should be immediately output once decoded. show_frame equal to 0
+ *              specifies that this frame should not be immediately output. (It may be output later if a later uncompressed
+ *              header uses show_existing_frame equal to 1).
+ * @showable_frame: equal to 1 specifies that the frame may be output using the show_existing_frame mechanism.
+ *                  showable_frame equal to 0 specifies that this frame will not be output using the show_existing_frame
+ *                  mechanism. It is a requirement of bitstream conformance that when show_existing_frame is used to show
+ *                  a previous frame, that the value of showable_frame for the previous frame was equal to 1.
+ *                  It is a requirement of bitstream conformance that a particular showable frame is output via the
+ *                  show_existing_frame mechanism at most once.
+ * @error_resilient_mode: equal to 1 indicates that error resilient mode is enabled; error_resilient_mode equal to 0 indicates
+ *                        that error resilient mode is disabled.
+ * @disable_cdf_update: specifies whether the CDF update in the symbol decoding process should be disabled.
+ * @allow_screen_content_tools: equal to 1 indicates that intra blocks may use palette encoding; allow_screen_content_tools
+ *                              equal to 0 indicates that palette encoding is never used.
+ * @force_integer_mv: equal to 1 specifies that motion vectors will always be integers. force_integer_mv equal to 0 specifies
+ *                    that motion vectors can contain fractional bits.
+ * @current_frame_id: specifies the frame id number for the current frame. Frame id numbers are additional information that
+ *                    do not affect the decoding process, but provide decoders with a way of detecting missing reference frames
+ *                    so that appropriate action can be taken.
+ * @frame_size_override_flag: equal to 0 specifies that the frame size is equal to the size in the sequence header.
+ *                            frame_size_override_flag equal to 1 specifies that the frame size will either be specified as the
+ *                            size of one of the reference frames, or computed from the frame_width_minus_1 and
+ *                            frame_height_minus_1 syntax elements.
+ * @order_hint: is used to compute OrderHint.
+ * @primary_ref_frame: specifies which reference frame contains the CDF values and other state that should be loaded at the
+ *                     start of the frame.
+ * @buffer_removal_delay_present: equal to 1 specifies that the buffer_removal_delay syntax element is present for each
+ *                                decoder model operating point that applies to this frame.
+ * @buffer_removal_delay: is a syntax element used by the decoder model. It does not affect the decoding process.
+ * @refresh_frame_flags: contains a bitmask that specifies which reference frame slots will be updated with the current frame
+ *                       after it is decoded.
+ *                       If frame_type is equal to GST_AV1_INTRA_ONLY_FRAME, it is a requirement of bitstream conformance that
+ *                       refresh_frame_flags is not equal to 0xff.
+ * @ref_order_hint[i]: specifies the expected output order hint for each reference buffer.
+ * @allow_intrabc: equal to 1 indicates that intra block copy may be used in this frame. allow_intrabc equal to 0 indicates that
+ *                 intra block copy is not allowed in this frame.
+ * @frame_refs_short_signaling: equal to 1 indicates that only two reference frames are explicitly signaled.
+ *                              frame_refs_short_signaling equal to 0 indicates that all reference frames are explicitly signaled.
+ * @last_frame_idx: specifies the reference frame to use for LAST_FRAME.
+ * @gold_frame_idx: specifies the reference frame to use for GOLDEN_FRAME.
+ * @delta_frame_id_minus_1 is used to calculate DeltaFrameId.
+ * @allow_high_precision_mv: equal to 0 specifies that motion vectors are specified to quarter pel precision;
+ *                           allow_high_precision_mv equal to 1 specifies that motion vectors are specified to eighth pel
+ *                           precision.
+ * @is_motion_mode_switchable: equal to 0 specifies that only the SIMPLE motion mode will be used.
+ * @use_ref_frame_mvs: equal to 1 specifies that motion vector information from a previous frame can be used when
+ *                     decoding the current frame. use_ref_frame_mvs equal to 0 specifies that this information will
+ *                     not be used.
+ * @disable_frame_end_update_cdf: equal to 1 indicates that the end of frame CDF update is disabled;
+ *                                disable_frame_end_update_cdf equal to 0 indicates that the end of frame CDF update
+ *                                is enabled.
+ * @allow_warped_motion: equal to 1 indicates that the syntax element motion_mode may be present. allow_warped_motion
+ *                       equal to 0 indicates that the syntax element motion_mode will not be present (this means that
+ *                       LOCALWARP cannot be signaled if allow_warped_motion is equal to 0).
+ * @reduced_tx_set: equal to 1 specifies that the frame is restricted to a reduced subset of the full set of transform
+ *                  types.
+ * @frame_width_minus_1: plus one is the width of the frame in luma samples.
+ *                       It is a requirement of bitstream conformance that frame_width_minus_1 is less than or equal to
+ *                       max_frame_width_minus_1.
+ * @frame_height_minus_1: plus one is the height of the frame in luma samples.
+ *                        It is a requirement of bitstream conformance that frame_height_minus_1 is less than or equal to
+ *                        max_frame_height_minus_1.
+ * @render_and_frame_size_different: equal to 0 means that the render width and height are inferred from the frame width
+ *                                   and height. render_and_frame_size_different equal to 1 means that the render width
+ *                                   and height are explicitly coded in the bitstream.
+ * @render_width_minus_1: plus one is the render width of the frame in luma samples.
+ * @render_height_minus_1: plus one is the render height of the frame in luma samples.
+ * @found_ref: equal to 1 indicates that the frame dimensions can be inferred from reference frame i where i is the loop
+ *             counter in the syntax parsing process for frame_size_with_refs. found_ref equal to 0 indicates that the
+ *             frame dimensions are not inferred from reference frame i.
+ * @use_superres: equal to 0 indicates that no upscaling is needed. use_superres equal to 1 indicates that upscaling is
+ *                needed.
+ * @coded_denom: is used to compute the amount of upscaling.
+ * @is_filter_switchable: equal to 1 indicates that the filter selection is signaled at the block level;
+ *                         is_filter_switchable equal to 0 indicates that the filter selection is signaled at the
+ *                        frame level.
+ * @interpolation_filter: specifies the filter selection used for performing inter prediction.
+ */
+#define GST_AV1_NUM_REF_FRAMES 8
+#define GST_AV1_REFS_PER_FRAME 7
+struct _GstAV1FrameHeaderOBU {
+  guint8 show_existing_frame;
+  guint8 frame_to_show_map_idx;
+  guint32 display_frame_id;
+  GstAV1FrameType frame_type;
+  guint8 show_frame;
+  guint8 showable_frame;
+  guint8 error_resilient_mode;
+  guint8 disable_cdf_update;
+  guint8 allow_screen_content_tools;
+  guint8 force_integer_mv;
+  guint32 current_frame_id;
+  guint8 frame_size_override_flag;
+  guint32 order_hint;
+  guint8 primary_ref_frame;
+  guint8 buffer_removal_delay_present;
+  guint32 buffer_removal_delay;
+  guint8 refresh_frame_flags;
+  guint32 ref_order_hint[GST_AV1_NUM_REF_FRAMES];
+  guint8 allow_intrabc;
+  guint8 frame_refs_short_signaling;
+  guint8 last_frame_idx;
+  guint8 gold_frame_idx;
+  guint8 ref_frame_idx[GST_AV1_NUM_REF_FRAMES];
+  guint32 delta_frame_id_minus_1; // present in for loop --> check obu.c
+  guint8 allow_high_precision_mv;
+  guint8 is_motion_mode_switchable;
+  guint8 use_ref_frames_mvs;
+  guint8 disable_frame_end_update_cdf;
+  guint8 allow_warped_motion;
+  guint8 reduced_tx_set;
+  guint16 frame_width_minus_1;
+  guint16 frame_height_minus_1;
+  guint8 render_and_frame_size_different;
+  guint16 render_width_minus_1;
+  guint16 render_height_minus_1;
+  guint8 found_ref;
+  guint8 use_superres;
+  guint8 coded_denom;
+  guint8 is_filter_switchable;
+  GstAV1InterpolationFilter interpolation_filter;
+  GstAV1LoopFilterParams loop_filter_params;
+  GstAV1QuantizationParams quantization_params;
+  GstAV1SegmenationParams segmentation_params;
+};
 
 GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
