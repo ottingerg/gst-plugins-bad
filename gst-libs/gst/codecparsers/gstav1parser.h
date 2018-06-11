@@ -268,6 +268,15 @@ typedef enum {
   GST_AV1_INTERPOLATIONG_FILTER_SWITCHABLE = 4,
 } GstAV1InterpolationFilter;
 
+/**
+ * GstAV1TXModes:
+ *
+ */
+typedef enum {
+  GST_AV1_TX_MODE_ONLY_4x4 = 0,
+  GST_AV1_TX_MODE_LARGEST = 1,
+  GST_AV1_TX_MODE_SELECT = 2,
+} GstAV1TXModes;
 
 /**
  * _GstAV1OperatingPoints:
@@ -855,6 +864,23 @@ struct _GstAV1CDEFParams {
 };
 
 /**
+ * _GstAV1LoopRestorationParams:
+ *
+ * @lr_type: specifies the type of restoration for each plane
+ * @lr_unit_shift: specifies if the luma restoration size should be halved.
+ * @lr_unit_extra_shift: specifies if the luma restoration size should be halved again.
+ * @lr_uv_shift: is only present for 4:2:0 formats and specifies if the chroma size should be half the luma size. * @
+ *
+ */
+
+struct _GstAV1LoopRestorationParams {
+  guint8 lr_type;
+  guint8 lr_unit_shift;
+  guint8 lr_unit_extra_shift;
+  guint8 lr_uv_shift;
+};
+
+/**
  * _GstAV1FrameHeaderOBU:
  *
  * @show_existing_frame: equal to 1, indicates the frame indexed by frame_to_show_map_idx is to be output;
@@ -946,6 +972,12 @@ struct _GstAV1CDEFParams {
  *                         is_filter_switchable equal to 0 indicates that the filter selection is signaled at the
  *                        frame level.
  * @interpolation_filter: specifies the filter selection used for performing inter prediction.
+ * @skip_mode_present: equal to 1 specifies that the syntax element skip_mode will be coded in the bitstream.
+ *                     skip_mode_present equal to 0 specifies that skip_mode will not be used for this frame.
+ * @reference_select: equal to 1 specifies that the mode info for inter blocks contains the syntax element comp_mode that
+ *                    indicates whether to use single or compound reference prediction. Reference_select equal to 0
+ *                    specifies that all interblocks will use single prediction.
+ *
  */
 #define GST_AV1_NUM_REF_FRAMES 8
 #define GST_AV1_REFS_PER_FRAME 7
@@ -994,6 +1026,10 @@ struct _GstAV1FrameHeaderOBU {
   GstAV1QuantizationParams quantization_params;
   GstAV1SegmenationParams segmentation_params;
   GstAV1CDEFParams cdef_params;
+  GstAV1LoopRestorationParams loop_restoration_params;
+  GstAV1TXModes TxMode;
+  guint8 skip_mode_present;
+  guint8 reference_select;
 };
 
 GST_CODEC_PARSERS_API
