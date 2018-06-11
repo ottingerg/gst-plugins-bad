@@ -740,6 +740,12 @@ struct _GstAV1MetadataOBU {
  *                       update_mode_delta equal to 0 means that the bitstream does not contain this syntax element.
  * @loop_filter_mode_deltas[]: contains the adjustment needed for the filter level based on the chosen mode. If this syntax
  *                             element is not present in the bitstream, it maintains its previous value.
+ * --- includes Loop filter delta parameters:
+ * @delta_lf_present specifies whether loop filter delta values are present in the bitstream.
+ * @delta_lf_res: specifies the left shift which should be applied to decoded loop filter delta values.
+ * @delta_lf_multi: equal to 1 specifies that separate loop filter deltas are sent for horizontal luma edges, vertical luma
+ *                  edges, the U edges, and the V edges. delta_lf_multi equal to 0 specifies that the same loop filter delta
+ *                  is used for all edges.
  *
  */
 
@@ -756,6 +762,9 @@ struct _GstAV1LoopFilterParams {
   guint8 update_mode_deltas[2]; // is 2 fixed?
   guint8 loop_filter_mode_deltas[2];
 
+  guint8 delta_lf_present;
+  guint8 delta_lf_res;
+  guint8 delta_lf_multi;
 };
 
 /**
@@ -773,6 +782,9 @@ struct _GstAV1LoopFilterParams {
  * @qm_y: specifies the level in the quantizer matrix that should be used for luma plane decoding.
  * @qm_u: specifies the level in the quantizer matrix that should be used for chroma U plane decoding.
  * @qm_v: specifies the level in the quantizer matrix that should be used for chroma V plane decoding.
+ * --- includes Quantizer index delta parameters:
+ * @delta_q_present: specifies whether quantizer index delta values are present in the bitstream.
+ * @delta_q_res: specifies the left shift which should be applied to decoded quantizer index delta values.
  */
 struct _GstAV1QuantizationParams {
   guint8 base_q_idx;
@@ -786,6 +798,8 @@ struct _GstAV1QuantizationParams {
   guint8 qm_y;
   guint8 qm_u;
   guint8 qm_v;
+  guint8 delta_q_present;
+  guint8 delta_q_res;
 };
 
 /**
@@ -820,7 +834,28 @@ struct _GstAV1SegmenationParams {
 };
 
 /**
- * _GstAV1MetadataOBU:
+ * _GstAV1CDEFParams:
+ * @cdef_damping_minus_3 controls the amount of damping in the deringing filter.
+ * @cdef_bits specifies the number of bits needed to specify which CDEF filter to apply.
+ * @cdef_y_pri_strength: specify the strength of the primary filter (Y component)
+ * @cdef_uv_pri_strength: specify the strength of the primary filter (UV components).
+ * @cdef_y_sec_strength: specify the strength of the secondary filter (Y component).
+ * @cdef_uv_sec_strength: specify the strength of the secondary filter (UV components).
+ *
+ */
+
+#define GST_AV1_CDEF_MAX (1<<3)
+struct _GstAV1CDEFParams {
+  guint8 cdef_damping_minus_3;
+  guint8 cdef_bits;
+  guint8 cdef_y_pri_strength[GST_AV1_CDEF_MAX];
+  guint8 cdef_y_sec_strength[GST_AV1_CDEF_MAX];
+  guint8 cdef_uv_pri_strength[GST_AV1_CDEF_MAX];
+  guint8 cdef_uv_sec_strength[GST_AV1_CDEF_MAX];
+};
+
+/**
+ * _GstAV1FrameHeaderOBU:
  *
  * @show_existing_frame: equal to 1, indicates the frame indexed by frame_to_show_map_idx is to be output;
  *                       show_existing_frame equal to 0 indicates that further processing is required.
@@ -958,6 +993,7 @@ struct _GstAV1FrameHeaderOBU {
   GstAV1LoopFilterParams loop_filter_params;
   GstAV1QuantizationParams quantization_params;
   GstAV1SegmenationParams segmentation_params;
+  GstAV1CDEFParams cdef_params;
 };
 
 GST_CODEC_PARSERS_API
