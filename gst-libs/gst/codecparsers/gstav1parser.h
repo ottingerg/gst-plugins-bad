@@ -842,6 +842,32 @@ struct _GstAV1SegmenationParams {
   guint8 FeatureData[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
 };
 
+
+/**
+ * _GstAV1TileInfo:
+ * @uniform_tile_spacing_flag: equal to 1 means that the tiles are uniformly spaced across the frame. (In other words, all
+ *                             tiles are the same size except for the ones at the right and bottom edge which can be smaller.)
+ *                             uniform_tile_spacing_flag equal to 0 means that the tile sizes are coded.
+ * @TileColsLog2: specifies the base 2 logarithm of the desired number of tiles across the frame.
+ * @TileRowsLog2: specifies the base 2 logarithm of the desired number of tiles down the frame.
+ * @width_in_sbs_minus_1: specifies the width of a tile minus 1 in units of superblocks.
+ * @height_in_sbs_minus_1: specifies the height of a tile minus 1 in units of superblocks.
+ * @context_update_tile_id: specifies which tile to use for the CDF update.
+ * @tile_size_bytes_minus_1: is used to compute TileSizeBytes
+ *
+ */
+#define GST_AV1_MAX_TILE_COLS 64
+#define GST_AV1_MAX_TILE_ROWS 64
+struct _GstAV1TileInfo {
+  guint8 uniform_tile_spacing_flag;
+  guint8 TileColsLog2;
+  guint TileRowLog2;
+  guint32 width_in_sbs_minus_1[GST_AV1_MAX_TILE_COLS];
+  guint32 height_in_sbs_minus_1[GST_AV1_MAX_TILE_ROWS];
+  guint8 context_update_tile_id;
+  guint8 tile_size_bytes_minus_1;
+};
+
 /**
  * _GstAV1CDEFParams:
  * @cdef_damping_minus_3 controls the amount of damping in the deringing filter.
@@ -1152,6 +1178,7 @@ struct _GstAV1FrameHeaderOBU {
   GstAV1LoopFilterParams loop_filter_params;
   GstAV1QuantizationParams quantization_params;
   GstAV1SegmenationParams segmentation_params;
+  GstAV1TileInfo tile_info;
   GstAV1CDEFParams cdef_params;
   GstAV1LoopRestorationParams loop_restoration_params;
   guint8 tx_mode_select;
