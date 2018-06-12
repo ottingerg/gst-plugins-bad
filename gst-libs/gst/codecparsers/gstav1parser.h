@@ -881,6 +881,131 @@ struct _GstAV1LoopRestorationParams {
 };
 
 /**
+ * _GstAV1GlobalMotionParams:
+ *
+ * @is_global: specifies whether global motion parameters are present for a particular reference frame.
+ * @is_rot_zoom: specifies whether a particular reference frame uses rotation and zoom global motion.
+ * @is_translation: specifies whether a particular reference frame uses translation global motion.
+ *
+ */
+struct _GstAV1GlobalMotionParams {
+  guint8 is_global[GST_AV1_NUM_REF_FRAMES];
+  guint8 is_rot_zoom[GST_AV1_NUM_REF_FRAMES];
+  guint8 is_translation[GST_AV1_NUM_REF_FRAMES];
+};
+
+/**
+ * _GstAV1GlobalMotionParams:
+ *
+ * @apply_grain: equal to 1 specifies that film grain should be added to this frame. apply_grain equal to 0
+ *               specifies that film grain should not be added.
+ * @grain_seed: specifies the starting value for the pseudo-random numbers used during film grain synthesis.
+ * @update_grain: equal to 1 means that a new set of parameters should be sent. update_grain equal to 0 means
+ *                that the previous set of parameters should be used.
+ * @film_grain_params_ref_idx: indicates which reference frame contains the film grain parameters to be used
+ *                             for this frame.
+ * @num_y_points: specifies the number of points for the piece-wise linear scaling function of the luma component.
+ *                It is a requirement of bitstream conformance that num_y_points is less than or equal to 14.
+ * @point_y_value[i]: represents the x (luma value) coordinate for the i-th point of the piecewise linear scaling
+ *                    function for luma component. The values are signaled on the scale of 0..255. (In case of 10
+ *                    bit video, these values correspond to luma values divided by 4. In case of 12 bit video,
+ *                    these values correspond to luma values divided by 16.) If i is greater than 0, it is a r
+ *                    equirement of bitstream conformance that point_y_value[ i ] is greater than
+ *                    point_y_value[ i - 1 ] (this ensures the x coordinates are specified in increasing order).
+ * @point_y_scaling[i]: represents the scaling (output) value for the i-th point of the piecewise linear scaling
+ *                      function for luma component. chroma_scaling_from_luma specifies that the chroma scaling
+ *                      is inferred from the luma scaling.
+ * @num_cb_points: specifies the number of points for the piece-wise linear scaling function of the cb component.
+ *                 It is a requirement of bitstream conformance that num_cb_points is less than or equal to 10.
+ * @point_cb_value[i]: represents the x coordinate for the i-th point of the piece-wise linear scaling function
+ *                     for cb component. The values are signaled on the scale of 0..255. If i is greater than 0,
+ *                     it is a requirement of bitstream conformance that point_cb_value[ i ] is greater than
+ *                     point_cb_value[ i - 1 ].
+ * @point_cb_scaling[i]: represents the scaling (output) value for the i-th point of the piecewise linear scaling
+ *                       function for cb component.
+ * @num_cr_points: specifies represents the number of points for the piece-wise linear scaling function of the cr
+ *                 component.
+ *                 It is a requirement of bitstream conformance that num_cr_points is less than or equal to 10.
+ *                 If subsampling_x is equal to 1 and subsampling_y is equal to 1 and num_cb_points is equal to 0,
+ *                 it is a requirement of bitstream conformance that num_cr_points is equal to 0.
+ *                 If subsampling_x is equal to 1 and subsampling_y is equal to 1 and num_cb_points is not equal
+ *                 to 0, it is a requirement of bitstream conformance that num_cr_points is not equal to 0.
+ *
+ * @point_cr_value[i]: represents the x coordinate for the i-th point of the piece-wise linear scaling function for
+ *                     cr component. The values are signaled on the scale of 0..255. If i is greater than 0, it is a
+ *                     requirement of bitstream conformance that point_cr_value[ i ] is greater than
+ *                     point_cr_value[ i - 1 ].
+ * @point_cr_scaling[i]: represents the scaling (output) value for the i-th point of the piecewise linear scaling
+ *                       function for cr component.
+ * @grain_scaling_minus_8: represents the shift – 8 applied to the values of the chroma component. The
+ *                         grain_scaling_minus_8 can take values of 0..3 and determines the range and quantization
+ *                         step of the standard deviation of film grain.
+ * @ar_coeff_lag: specifies the number of auto-regressive coefficients for luma and chroma.
+ * @ar_coeffs_y_plus_128[i]: specifies auto-regressive coefficients used for the Y plane.
+ * @ar_coeffs_cb_plus_128[i]: specifies auto-regressive coefficients used for the U plane.
+ * @ar_coeffs_cr_plus_128[i]: specifies auto-regressive coefficients used for the V plane.
+ * @ar_coeff_shift_minus_6: specifies the range of the auto-regressive coefficients. Values of 0, 1, 2, and 3
+ *                          correspond to the ranges for auto-regressive coefficients of [-2, 2), [-1, 1),
+ *                          [-0.5, 0.5) and [-0.25, 0.25) respectively.
+ * @grain_scale_shift: specifies how much the Gaussian random numbers should be scaled down during the grain
+ *                     synthesis process.
+ * @cb_mult: represents a multiplier for the cb component used in derivation of the input index to the cb component
+ *           scaling function.
+ * @cb_luma_mult: represents a multiplier for the average luma component used in derivation of the input index to
+ *                the cb component scaling function.
+ * @cb_offset: represents an offset used in derivation of the input index to the cb component scaling function.
+ * @cr_mult: represents a multiplier for the cr component used in derivation of the input index to the cr component
+ *           scaling function.
+ * @cr_luma_mult: represents a multiplier for the average luma component used in derivation of the input index to
+ *                the cr component scaling function.
+ * @cr_offset: represents an offset used in derivation of the input index to the cr component scaling function.
+ * @overlap_flag: equal to 1 indicates that the overlap between film grain blocks shall be applied. overlap_flag
+ *                equal to 0 indicates that the overlap between film grain blocks shall not be applied.
+ * @clip_to_restricted_range: equal to 1 indicates that clipping to the restricted (studio) range shall be applied
+ *                            to the sample values after adding the film grain (see the semantics for color_range
+ *                            for an explanation of studio swing).
+ *                            clip_to_restricted_range equal to 0 indicates that clipping to the full range shall
+ *                            be applied to the sample values after adding the film grain.
+ *
+ */
+
+#define GST_AV1_MAX_NUM_Y_POINTS 15
+#define GST_AV1_MAX_NUM_CB_POINTS 15
+#define GST_AV1_MAX_NUM_CR_POINTS 15
+#define GST_AV1_MAX_NUM_POS_LUMA 25
+
+struct _GstAV1FilmGrainParams {
+  guint8 apply_grain;
+  guint16 grain_seed;
+  guint8 update_grain;
+  guint8 film_grain_params_ref_idx;
+  guint8 num_y_points;
+  guint8 point_y_value[GST_AV1_MAX_NUM_Y_POINTS];
+  guint8 point_y_value[GST_AV1_MAX_NUM_Y_POINTS];
+  guint8 chrome_scaling_from_luma;
+  guint8 num_cb_points;
+  guint8 point_cb_value[GST_AV1_MAX_NUM_CB_POINTS];
+  guint8 point_cb_scaling[GST_AV1_MAX_NUM_CB_POINTS];
+  guint8 num_cr_points;
+  guint8 point_cr_value[GST_AV1_MAX_NUM_CR_POINTS];
+  guint8 point_cr_scaling[GST_AV1_MAX_NUM_CR_POINTS];
+  guint8 grain_scaling_minus_8;
+  guint8 ar_coeff_lag;
+  guint8 ar_coeffs_y_plus_128[GST_AV1_MAX_NUM_POS_LUMA];
+  guint8 ar_coeffs_cb_plus_128[GST_AV1_MAX_NUM_POS_LUMA];
+  guint8 ar_coeffs_cr_plus_128[GST_AV1_MAX_NUM_POS_LUMA];
+  guint8 ar_coeff_shift_minus_6;
+  guint8 grain_scale_shift;
+  guint8 cb_mult;
+  guint8 cb_luma_mult;
+  guint8 cb_offset;
+  guint8 cr_mult;
+  guint8 cr_luma_mult;
+  guint8 cr_offset;
+  guint8 overlap_flag;
+  guint8 clip_to_restricted_range;
+};
+/**
  * _GstAV1FrameHeaderOBU:
  *
  * @show_existing_frame: equal to 1, indicates the frame indexed by frame_to_show_map_idx is to be output;
@@ -888,6 +1013,7 @@ struct _GstAV1LoopRestorationParams {
  *                       If obu_type is equal to OBU_FRAME, it is a requirement of bitstream conformance
  *                       that show_existing_frame is equal to 0.
  * @frame_to_show_map_idx: specifies the frame to be output. It is only available if show_existing_frame is 1.
+ * @tu_presentation_delay: is a syntax element used by the decoder model. It does not affect the decoding process.
  * @display_frame_id provides: the frame id number for the frame to output. It is a requirement of bitstream conformance
  *                             that whenever display_frame_id is read, the value matches RefFrameId[ frame_to_show_map_idx ]
  *                             (the value of current_frame_id at the time that the frame indexed by frame_to_show_map_idx was
@@ -984,6 +1110,7 @@ struct _GstAV1LoopRestorationParams {
 struct _GstAV1FrameHeaderOBU {
   guint8 show_existing_frame;
   guint8 frame_to_show_map_idx;
+  guint32 tu_presentation_delay;
   guint32 display_frame_id;
   GstAV1FrameType frame_type;
   guint8 show_frame;
@@ -1027,9 +1154,11 @@ struct _GstAV1FrameHeaderOBU {
   GstAV1SegmenationParams segmentation_params;
   GstAV1CDEFParams cdef_params;
   GstAV1LoopRestorationParams loop_restoration_params;
+  guint8 tx_mode_select;
   GstAV1TXModes TxMode;
   guint8 skip_mode_present;
   guint8 reference_select;
+  GstAV1GlobalMotionParams global_motion_params;
 };
 
 GST_CODEC_PARSERS_API
