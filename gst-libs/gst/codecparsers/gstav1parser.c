@@ -38,7 +38,7 @@
 
 #define gst_av1_read_bit(br) gst_bit_reader_get_bits_uint8_unchecked(br, 1)
 #define gst_av1_read_bits(br, bits) gst_bit_reader_get_bits_uint32_unchecked(br, bits)
-
+#define gst_av1_bit_reader_skip(br, bits) gst_bit_reader_skip(br,bits)
 
 GstAV1ParserResult gst_av1_bistreamfn_leb128(GstBitReader *br, guint64 *value)
 {
@@ -218,7 +218,7 @@ GstAV1ParserResult gst_av1_parse_operating_parameters_info(GstBitReader *br,GstA
   return GST_AV1_PARSE_OK;
 }
 
-GstAV1ParserResult gst_av1_parse_sequence_header( GstBitReader *br, GstAV1SequenceHeaderOBU *seq_header)
+GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstBitReader *br, GstAV1SequenceHeaderOBU *seq_header)
 {
   bzero(seq_header, sizeof(GstAV1SequenceHeaderOBU));
 
@@ -348,18 +348,131 @@ GstAV1ParserResult gst_av1_parse_sequence_header( GstBitReader *br, GstAV1Sequen
 
   gst_av1_parse_color_config(br,seq_header, &(seq_header->color_config));
 
-  if ( seq_header->reduced_still_picture_header )
-    seq_header->timing_info_present_flag = 0;
-  else
+  seq_header->film_grain_params_present = gst_av1_read_bit(br);
+}
+
+GstAV1ParserResult gst_av1_parse_metadata_itut_t35( GstBitReader *br, GstAV1MetadataITUT_T35 *itut_t35)
+{
+  itut_t35->itu_t_t35_country_code = gst_av1_read_bits(br,8);
+  if(itut_t35->itu_t_t35_country_code) {
+    itut_t35->itu_t_t35itu_t_t35_country_code_extension_byte = gst_av1_read_bits(br,8);
+  }
+  //ommiting itu_t_t35_payload_bytes
+
+  return GST_AV1_PARSE_OK;
+}
 
 
-  seq_header->operating_points_decoder_model_present = gst_av1_read_bit(br);
-  if( seq_header->operating_points_decoder_model_present ) {
-    seq_header->operating_points_decoder_model_count_minus_1  = gst_av1_read_bits(br,5);
-    gst_av1_parse_decoder_model_operating_points(br, seq_header->operdecoder_model_operating_points,seq_header->operating_points_decoder_model_count_minus_1);
-  } else {
-    seq_header->operating_points_decoder_model_count_minus_1 = -1;
+GstAV1ParserResult gst_av1_parse_metadata_hdr_cll( GstBitReader *br, GstAV1MetadataHdrCll *hdr_cll)
+{
+
+  hdr_cll->max_cll = gst_av1_read_bits(br,16);
+  hdr_cll->max_fall = gst_av1_read_bits(br,16);
+
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_metadata_hdr_mdcv( GstBitReader *br, GstAV1MetadataHdrMdcv *hdr_mdcv)
+{
+
+  for(int i = 0; i < 4; i++) {
+    hdr_mdcv->primary_chromaticity_x[i] = gst_av1_read_bits(br,16);
+    hdr_mdcv->primary_chromaticity_y[i] = gst_av1_read_bits(br,16);
   }
 
-  seq_header->film_grain_params_present = gst_av1_read_bit(br);
+  hdr_mdcv->white_point_chromaticity_x = gst_av1_read_bits(br,16);
+  hdr_mdcv->white_point_chromaticity_y = gst_av1_read_bits(br,16);
+
+  hdr_mdcv->luminance_max = gst_av1_read_bits(br,32);
+  hdr_mdcv->luminance_min = gst_av1_read_bits(br,32);
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_metadata_scalability( GstBitReader *br, GstAV1MetadataScalability *scalability)
+{
+  scalability->scalability_mode_idc = gst_av1_read_bits(br,8);
+  scalability->spatial_layers_cnt_minus_1 = gst_av1_read_bits(br,2);
+  scalability->spatial_layer_dimensions_present_flag = gst_av1_read_bit(br);
+  scalability->spatial_layer_description_present_flag = gst_av1_read_bit(br);
+  scalability->temporal_group_description_present_flag = gst_av1_read_bit(br);
+  scalability->scalability_structure_reserved_3bits = gst_av1_read_bit(br);
+  if ( scalability->spatial_layer_dimensions_present_flag ) {
+    for ( i = 0; i <= scalability->spatial_layers_cnt_minus_1 ; i++ ) {
+      spatial_layer_max_width[i] = gst_av1_read_bits(br,16);
+      spatial_layer_max_height[i] = gst_av1_read_bits(br,16);
+    }
+  }
+
+  if ( scalability->spatial_layer_description_present_flag ) {
+    for ( i = 0; i <= scalability->spatial_layers_cnt_minus_1; i++ )
+      scalability->spatial_layer_ref_id[i] = gst_av1_read_bit(br);
+  }
+
+  if ( scalability->temporal_group_description_present_flag ) {
+    scalabilty->temporal_group_size = gst_av1_read_bits(br,8);
+    for ( i = 0; i < scalability->temporal_group_size; i++ ) {
+      scalability->temporal_group_temporal_id[i] = gst_av1_read_bits(br,3);
+      scalability->temporal_group_temporal_switching_up_point_flag[i] = gst_av1_read_bit(br);
+      scalability->temporal_group_spatial_switching_up_point_flag[i] = gst_av1_read_bit(br);
+      scalability->temporal_group_ref_cnt[i] = gst_av1_read_bits(br,3):
+      for ( j = 0; j < temporal_group_ref_cnt[i]; j++ ) {
+        temporal_group_ref_pic_diff[i][j] = gst_av1_read_bits(br,8);
+      }
+    }
+  }
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_metadata_timecode( GstBitReader *br, GstAV1MetadataTimecode *timecode)
+{
+  timecode->counting_type = gst_av1_read_bits(br,5);
+  timecode->full_timestamp_flag = gst_av1_read_bit(br);
+  timecode->discontinuity_flag = gst_av1_read_bit(br);
+  timecode->cnt_dropped_flag = gst_av1_read_bit(br);
+  timecode->n_frames = gst_av1_read_bits(br,9);
+
+  if( timecode->full_timestamp_flag ) {
+    timecode->seconds_value = gst_av1_read_bits(br,6);
+    timecode->minutes_value = gst_av1_read_bits(br,6);
+    timecode->hours_value = gst_av1_read_bits(br,5);
+  } else {
+    timecode->seconds_flag = gst_av1_read_bit(br);
+    if( timecode->seconds_flag ) {
+      timecode->seconds_value = gst_av1_read_bits(br,6);
+      timecode->minutes_flag = gst_av1_read_bit(br);
+      if( timecode->minutes_flag ) {
+        timecode->minutes_value = gst_av1_read_bits(br,6);
+        timecode->hours_flag = gst_av1_read_bit(br);
+        if( timecode->hours_flag )
+          timecode->hours_value = gst_av1_read_bits(br,6);
+      }
+    }
+  }
+
+  timecode->time_offset_length = gst_av1_read_bits(br,5);
+  if( timecode->time_offset_length > 0 ) {
+    timecode->time_offset_value = gst_av1_read_bits(br,timecode->time_offset_length);
+  }
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_tile_list_obu( GstBitReader *br, GstAV1TileListOBU *tile_list)
+{
+  tile_list->output_frame_width_in_tiles_minus_1 = gst_av1_read_bits(br,8);
+  tile_list->output_frame_height_in_tiles_minus_1 = gst_av1_read_bits(br,8);
+  tile_list->tile_count_minus_1 = gst_av1_read_bits(br,16);
+  for ( tile = 0; tile <= tile_count_minus_1; tile++ ) {
+    tile_list->entry[tile].anchor_frame_idx = gst_av1_read_bits(br,8);
+    tile_list->entry[tile].anchor_tile_row = gst_av1_read_bits(br,8);
+    tile_list->entry[tile].anchor_tile_col = gst_av1_read_bits(br,8);
+    tile_list->entry[tile].tile_data_size_minus_1 = gst_av1_read_bits(br,16);
+    //skip ofer coded_tile_data
+    gst_av1_bit_reader_skip(br,8*(tile_list->entry[tile].tile_data_size_minus_1+1)));
+  }
+
+  return GST_AV1_PARSE_OK;
 }
