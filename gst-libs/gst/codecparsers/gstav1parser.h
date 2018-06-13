@@ -48,7 +48,33 @@
 G_BEGIN_DECLS
 
 #define GST_AV1_MAX_OPERATING_POINTS 32
-#define GST_AV1_MAX_DECODER_MODEL_OPERATING_POINTS 32
+#define GST_AV1_MAX_TILE_COUNT 512
+#define GST_AV1_MAX_SPATIAL_LAYERS 2 //is this correct??
+#define GST_AV1_MAX_TEMPORAL_GROUP_SIZE 8 //is this correct??
+#define GST_AV1_MAX_TEMPORAL_GROUP_REFERENCES 8 //is this correct??
+#define GST_AV1_TOTAL_REFS_PER_FRAME 8
+#define GST_AV1_MAX_SEGMENTS 8
+#define GST_AV1_SEG_LVL_MAX 8
+#define GST_AV1_MAX_TILE_COLS 64
+#define GST_AV1_MAX_TILE_ROWS 64
+#define GST_AV1_CDEF_MAX (1<<3)
+#define GST_AV1_MAX_NUM_Y_POINTS 15
+#define GST_AV1_MAX_NUM_CB_POINTS 15
+#define GST_AV1_MAX_NUM_CR_POINTS 15
+#define GST_AV1_MAX_NUM_POS_LUMA 25
+#define GST_AV1_NUM_REF_FRAMES 8
+#define GST_AV1_REFS_PER_FRAME 7
+
+
+/**
+ * GstAV1ParserResult:
+ *
+ */
+
+typedef enum GstAV1ParserResult {
+  GST_AV1_PARSER_OK = 0,
+  GST_AV1_PARSER_ERROR = 1,
+};
 
 /**
  * GstAV1OBUType:
@@ -279,43 +305,97 @@ typedef enum {
 } GstAV1TXModes;
 
 /**
- * _GstAV1OperatingPoints:
+ * _GstAV1OBUHeader:
+ *
+ * @obu_forbidden_bit: must be set to 0.
+ * @obu_type specifies: the type of data structure contained in the OBU payload.
+ * @obu_has_size_field: equal to 1 indicates that the obu_size syntax element will be present.
+ *                      obu_has_size_field equal to 0 indicates that the obu_size syntax element will not be present.
+ * @obu_reserved_1bit: must be set to 0. The value is ignored by a decoder.
+ * @obu_size: contains the size in bytes of the OBU not including the bytes within obu_header
+ *            or the obu_size syntax element.
+ * @temporal_id: specifies the temporal level of the data contained in the OBU.
+ * @spatial_id: specifies the spatial level of the data contained in the OBU.
+ * @extension_header_reserved_3bits must be set to 0. The value is ignored by a decoder.
+ *
+ */
+
+struct _GstAV1OBUHeader {
+  guint8 obu_forbidden_bit;
+  GstAV1OBUType obu_type;
+  guint8 obu_extention_flag;
+  guint8 obu_has_size_field;
+  //guint8 reserved_1bit;
+  guint32 obu_size
+  guint8 obu_temporal_id;
+  guint8 obu_spatial_id;
+  //guint8 extension_header_reserved_3bits;
+};
+
+
+/**
+ * _GstAV1OperatingPoint:
+ *
  * @seq_level_idx: specifies the level that the coded video sequence conforms to.
  * @seq_tier: specifies the tier that the coded video sequence conforms to.
  * @idc: contains a bitmask that indicates which spatial and temporal layers should be decoded
  *       Bit k is equal to 1 if temporal layer k should be decoded (for k between 0 and 7).
  *       Bit j+8 is equal to 1 if spatial layer j should be decoded (for j between 0 and 3).
  *
+ * @decoder_model_present_for_this_op: equal to one indicates that there is a decoder model associated
+ *                                     with this operating point.decoder_model_present_for_this_op equal
+ *                                     to zero indicates that there is not a decoder model associated.
+ *
+ * @bitrate_minus_1: together with bitrate_scale specifies the maximum smoothing buffer input bitrate
+ *                   for the operating point op, in bits/s, as follows:
+ *                   BitRate = ( bitrate_minus_1 + 1 ) << ( 6 + bitrate_scale )
+ *                   bitrate_minus_1 shall be in the range of 0 to ( (1 << 32) - 2).
+ * @buffer_size_minus_1: together with buffer_size_scale specifies the smoothing buffer size for operating
+ *                       point op, in bits, as follows:
+ *                       BufferSize = ( buffer_size_minus_1 + 1 ) << ( 4 + buffer_size_scale )
+ *                       buffer_size_minus_1 shall be in the range of 0 to ( (1 << 32) - 2).
+ * @cbr_flag: equal to 0 indicates that the decoder model associated with operating point op operates in
+ *            variable bitrate (VBR) mode. cbr_flag equal to 1 indicates that the decoder model associated
+ *            with operating point op operates in constant bitrate (CBR) mode.
+ * @decoder_buffer_delay: specifies the time interval between the arrival of the first bit in the smoothing
+ *                        buffer and the subsequent removal of the data that belongs to the first coded
+ *                        frame for operating point op, measured in units of 1/90000 seconds. The length of
+ *                        decoder_buffer_delay is specified by buffer_delay_length_minus_1 + 1, in bits.
+ * @encoder_buffer_delay: specifies, in combination with decoder_buffer_delay syntax element, the first bit
+ *                        arrival time of frames to be decoded to the smoothing buffer. encoder_buffer_delay
+ *                        is measured in units of 1/90000 seconds. For a video sequence that includes one or
+ *                        more random access points the sum of decoder_buffer_delay and encoder_buffer_delay
+ *                        shall be kept constant.
+ * @low_delay_mode_flag: equal to 1 indicates that the smoothing buffer operates in low-delay mode for operating
+ *                       point op. In low-delay mode late decode times and buffer underflow are both permitted.
+ *                       low_delay_mode_flag equal to 0 indicates that the smoothing buffer operates in strict
+ *                       mode, where buffer underflow is not allowed.
+ * @initial_display_delay_present_for_this_op: equal to 1 indicates that initial_display_delay_minus_1
+ *                                             is specified for this operating. 0 indicates that
+ *                                             initial_display_delay_minus_1 is not specified for this
+ *                                             operating point.
+ * initial_display_delay_minus_1: plus 1 specifies, for operating point i, the number of decoded frames
+ *                                that should be present in the buffer pool before the first presentable
+ *                                frame is displayed. This will ensure that all presentable frames in the
+ *                                sequence can be decoded at or before the time that they are scheduled
+ *                                for display.
  */
 
-struct _GstAV1OperatingPoints {
+struct _GstAV1OperatingPoint {
   guint8 seq_level_idx;
   guint8 seq_tier;
   guint16 idc;
+  guint8 decoder_model_present_for_this_op;
+  guint8 bitrate_minus_1;
+  guint8 buffer_size_minus_1;
+  guint8 cbr_flag;
+  guint8 decoder_buffer_delay;
+  guint8 encoder_buffer_delay;
+  guint8 low_delay_mode_flag;
+  guint8 initial_display_delay_present_for_this_op;
+  guint8 initial_display_delay_minus_1;
 };
 
-/**
- * _GstAV1DecoderModelOperatingPoints:
- * @idc: specifies the corresponding operating point for a set of operatingparameters.
- * @param_present_flag: specifies whether param.X is present in the bitstream
- * @param.X: are syntax elements used by the decoder model. The
- *           value does not affect the decoding process.
- *
- */
-
-struct _GstAV1DecoderModelOperatingPoints {
-  guint16 idc;
-  guint8 param_present_flag;
-  struct {
-    guint8 initial_display_delay_minus_1;
-    guint8 bitrate_minus_1;
-    guint8 buffer_size_minus_1;
-    guint8 cbr_flag;
-    guint8 decoder_buffer_delay;
-    guint8 encoder_buffer_delay;
-    guint8 low_delay_mode_flag;
-  } param;
-};
 
 /**
  * _GstAV1DecoderModelInfo:
@@ -383,6 +463,8 @@ struct _GstAV1TimingInfo {
  * @separate_uv_delta_q: equal to 1 indicates that the U and V planes may have separate delta quantizer values. separate_uv_delta_q
  *                      equal to 0 indicates that the U and V planes will share the same delta quantizer value.
  *
+ * @BitDepth: BitDepth
+ * @NumPlanes: Number of planes
  */
 
 struct _GstAV1ColorConfig {
@@ -398,6 +480,8 @@ struct _GstAV1ColorConfig {
   guint8 subsampling_y;
   GstAV1ChromaSamplePositions chroma_sample_position;
   guint8 separate_uv_delta_q;
+  guint8 BitDepth;
+  guint8 NumPlanes;
 }
 
 /**
@@ -459,6 +543,7 @@ struct _GstAV1ColorConfig {
  * @operating_points[]: specifies the corresponding operating point for a set of operating parameters.
  * @decoder_model_info_present_flag: specifies whether the decoder model info is present in the bitstream.
  * @decoder_model_info: holds information about the decoder model.
+ * @initial_display_delay_present_flag: specifies whether initial display delay information is present in the bitstream or not.
  * @operating_points_decoder_model_present: specifies whether decoder operating points are present in the bitstream.
  * @operating_points_decoder_model_count_minus_1: plus 1 specifies the number of decoder model operating points
  *                                                present in the bitstream.
@@ -505,14 +590,11 @@ struct _GstAV1SequenceHeaderOBU {
 
 
   guint8 operating_points_cnt_minus_1;
-  GstAV1OperatingPoints operating_points[GST_AV1_MAX_OPERATING_POINTS];
+  GstAV1OperatingPoint operating_points[GST_AV1_MAX_OPERATING_POINTS];
 
   guint8 decoder_model_info_present_flag;
   GstAV1DecoderModelInfo decoder_model_info;
-
-  guint8 operating_points_decoder_model_present;
-  guint8 operating_points_decoder_model_count_minus_1;
-  GstAV1DecoderModelOperatingPoints decoder_model_operating_points[GST_AV1_MAX_DECODER_MODEL_OPERATING_POINTS];
+  guint8 initial_display_delay_present_flag;
 
   guint8 timing_info_present_flag;
   GstAV1TimingInfo timing_info;
@@ -619,9 +701,7 @@ struct _GstAV1MetadataHdrMdcv {
  *                                     counting only frames of identical spatial_id values.
  */
 
-#define GST_AV1_MAX_SPATIAL_LAYERS 2 //is this correct??
-#define GST_AV1_MAX_TEMPORAL_GROUP_SIZE 8 //is this correct??
-#define GST_AV1_MAX_TEMPORAL_GROUP_REFERENCES 8 //is this correct??
+
 
 struct _GstAV1MetadataScalability {
   GstAV1ScalabilityModes scalability_mode_idc;
@@ -758,7 +838,6 @@ struct _GstAV1MetadataOBU {
  *
  */
 
-#define GST_AV1_TOTAL_REFS_PER_FRAME 8
 struct _GstAV1LoopFilterParams {
   guint8 loop_filter_level[4]; //is 4 fixed??
   guint8 loop_filter_sharpness;
@@ -831,8 +910,7 @@ struct _GstAV1QuantizationParams {
  *
  */
 
-#define GST_AV1_MAX_SEGMENTS 8
-#define GST_AV1_SEG_LVL_MAX 8
+
 struct _GstAV1SegmenationParams {
   guint8 segmentation_enabled;
   guint8 segmentation_update_map;
@@ -856,8 +934,7 @@ struct _GstAV1SegmenationParams {
  * @tile_size_bytes_minus_1: is used to compute TileSizeBytes
  *
  */
-#define GST_AV1_MAX_TILE_COLS 64
-#define GST_AV1_MAX_TILE_ROWS 64
+
 struct _GstAV1TileInfo {
   guint8 uniform_tile_spacing_flag;
   guint8 TileColsLog2;
@@ -879,7 +956,6 @@ struct _GstAV1TileInfo {
  *
  */
 
-#define GST_AV1_CDEF_MAX (1<<3)
 struct _GstAV1CDEFParams {
   guint8 cdef_damping_minus_3;
   guint8 cdef_bits;
@@ -995,10 +1071,6 @@ struct _GstAV1GlobalMotionParams {
  *
  */
 
-#define GST_AV1_MAX_NUM_Y_POINTS 15
-#define GST_AV1_MAX_NUM_CB_POINTS 15
-#define GST_AV1_MAX_NUM_CR_POINTS 15
-#define GST_AV1_MAX_NUM_POS_LUMA 25
 
 struct _GstAV1FilmGrainParams {
   guint8 apply_grain;
@@ -1131,8 +1203,7 @@ struct _GstAV1FilmGrainParams {
  *                    specifies that all interblocks will use single prediction.
  *
  */
-#define GST_AV1_NUM_REF_FRAMES 8
-#define GST_AV1_REFS_PER_FRAME 7
+
 struct _GstAV1FrameHeaderOBU {
   guint8 show_existing_frame;
   guint8 frame_to_show_map_idx;
@@ -1187,6 +1258,43 @@ struct _GstAV1FrameHeaderOBU {
   guint8 reference_select;
   GstAV1GlobalMotionParams global_motion_params;
 };
+
+/**
+ * _GstAV1TileListOBU:
+ *
+ * @output_frame_width_in_tiles_minus_1: plus one is the width of the output frame, in tile units.
+ * @output_frame_height_in_tiles_minus_1: plus one is the height of the output frame, in tile units.
+ * @tile_count_minus_1: plus one is the number of tile_list_entry in the list.
+ *                      It is a requirement of bitstream conformance that tile_count_minus_1 is less
+ *                      than or equal to 511.
+ *
+ *
+ * @anchor_frame_idx: is the index into an array AnchorFrames of the frames that the tile uses for
+ *                    prediction. The AnchorFrames array is provided by external means and may change
+ *                    for each tile list OBU. The process for creating the AnchorFrames array is outside
+ *                    of the scope of this specification.
+ *                    It is a requirement of bitstream conformance that anchor_frame_idx is less than or
+ *                    equal to 127.
+ * @anchor_tile_row_ is: the row coordinate of the tile in the frame that it belongs, in tile units. It is
+ *                       a requirement of bitstream conformance that anchor_tile_row is less than TileRows.
+ * @anchor_tile_col: is the column coordinate of the tile in the frame that it belongs, in tile units.
+ *                   It is a requirement of bitstream conformance that anchor_tile_col is less than TileCols.
+ * @tile_data_size_minus_1: plus one is the size of the coded tile data, coded_tile_data, in bytes.
+ *
+ */
+
+struct _GstAV1TileListOBU {
+  guint8 output_frame_width_in_tiles_minus_1;
+  guint8 output_frame_height_in_tiles_minus_1;
+  guint16 tile_count_minus_1;
+  struct {
+    guint8 anchor_frame_idx;
+    guint8 anchor_tile_row;
+    guint8 anchor_tile_col;
+    guint16 tile_data_size_minus_1;
+    //guint8 coded_tile_data[]; //skipped
+  } entry[GST_AV1_MAX_TILE_COUNT];
+}
 
 GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
