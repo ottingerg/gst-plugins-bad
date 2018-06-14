@@ -64,7 +64,10 @@ G_BEGIN_DECLS
 #define GST_AV1_MAX_NUM_POS_LUMA 25
 #define GST_AV1_NUM_REF_FRAMES 8
 #define GST_AV1_REFS_PER_FRAME 7
-
+#define GST_AV1_PRIMARY_REF_NONE 7
+#define GST_AV1_SUPERRES_NUM 8
+#define GST_AV1_SUPERRES_DENOM_MIN 9
+#define GST_AV1_SUPERRES_DENOM_BITS 3
 
 /**
  * GstAV1ParserResult:
@@ -109,7 +112,7 @@ typedef enum {
   GST_AV1_METADATA_TYPE_RESERVED_0 = 0,
   GST_AV1_METADATA_TYPE_HDR_CLL = 1,
   GST_AV1_METADATA_TYPE_HDR_MDCV = 2,
-  GST_AV1_METADATA_TYPE_GST_AV1_SCALABILITY = 3,
+  GST_AV1_METADATA_TYPE_SCALABILITY = 3,
   GST_AV1_METADATA_TYPE_ITUT_T35 = 4,
   GST_AV1_METADATA_TYPE_TIMECODE = 5,
 } GstAV1MetadataType;
@@ -407,10 +410,10 @@ struct _GstAV1OperatingPoint {
 struct _GstAV1DecoderModelInfo {
   guint8 bitrate_scale;
   guint8 buffer_size_scale;
-  guint8 encoder_decoder_buffer_delay_length_minus_1;
+  guint8 buffer_delay_length_minus_1;
   guint32 num_units_in_decoding_tick;
-  guint8 buffer_removal_delay_length_minus_1;
-  guint8 frame_presentation_delay_length_minus_1;
+  guint8 buffer_removal_time_length_minus_1;
+  guint8 frame_presentation_time_length_minus_1;
 };
 
 /**
@@ -563,7 +566,7 @@ struct _GstAV1SequenceHeaderOBU {
   guint8 frame_height_bits_minus_1;
   guint16 max_frame_width_minus_1;
   guint16 max_frame_height_minus_1;
-  guint8 frame_id_number_present_flag;
+  guint8 frame_id_numbers_present_flag;
   guint8 delta_frame_id_length_minus_2;
   guint8 additional_frame_id_length_minus_1;
   guint8 use_128x128_superblock;
@@ -1111,6 +1114,11 @@ struct _GstAV1FilmGrainParams {
  *                       If obu_type is equal to OBU_FRAME, it is a requirement of bitstream conformance
  *                       that show_existing_frame is equal to 0.
  * @frame_to_show_map_idx: specifies the frame to be output. It is only available if show_existing_frame is 1.
+ * @frame_presentation_time: specifies the presentation time of the frame in clock ticks DispCT counted from the removal
+ *                           time of the last frame with frame_type equal to KEY_FRAME for the operating point that is being
+ *                           decoded. The syntax element is signaled as a fixed length unsigned integer with a length in bits
+ *                           given by frame_presentation_time_length_minus_1 + 1. The frame_presentation_time is the remainder
+ *                           of a modulo 1 << (frame_presentation_time_length_minus_1 + 1) counter.
  * @tu_presentation_delay: is a syntax element used by the decoder model. It does not affect the decoding process.
  * @display_frame_id provides: the frame id number for the frame to output. It is a requirement of bitstream conformance
  *                             that whenever display_frame_id is read, the value matches RefFrameId[ frame_to_show_map_idx ]
@@ -1119,6 +1127,8 @@ struct _GstAV1FilmGrainParams {
  *                             It is a requirement of bitstream conformance that the number of bits needed to read
  *                             display_frame_id does not exceed 16. This is equivalent to the constraint that idLen <= 16
  * @frame_type: specifies the type of the frame.
+ * @FrameIsIntra: 0 indicates that this frame may use inter prediction), the requirements described in the frame size with
+ *                refs semantics of section 6.7.5 must also be satisfied.
  * @show_frame: equal to 1 specifies that this frame should be immediately output once decoded. show_frame equal to 0
  *              specifies that this frame should not be immediately output. (It may be output later if a later uncompressed
  *              header uses show_existing_frame equal to 1).
@@ -1145,9 +1155,13 @@ struct _GstAV1FilmGrainParams {
  * @order_hint: is used to compute OrderHint.
  * @primary_ref_frame: specifies which reference frame contains the CDF values and other state that should be loaded at the
  *                     start of the frame.
- * @buffer_removal_delay_present: equal to 1 specifies that the buffer_removal_delay syntax element is present for each
- *                                decoder model operating point that applies to this frame.
- * @buffer_removal_delay: is a syntax element used by the decoder model. It does not affect the decoding process.
+ * @buffer_removal_time_present_flag: equal to 1 specifies that buffer_removal_time is present in the bitstream.
+ *                                    buffer_removal_time_present_flag equal to 0 specifies that buffer_removal_time is not present
+ *                                    in the bitstream.
+ * @buffer_removal_time[]: specifies the frame removal time in units of DecCT clock ticks counted from the removal time of the last
+ *                         frame with frame_type equal to KEY_FRAME for operating point opNum. buffer_removal_time is signaled as a
+ *                         fixed length unsigned integer with a length in bits given by buffer_removal_time_length_minus_1 + 1.
+ *                         buffer_removal_time is the remainder of a modulo 1 << ( buffer_removal_time_length_minus_1 + 1 ) counter.
  * @refresh_frame_flags: contains a bitmask that specifies which reference frame slots will be updated with the current frame
  *                       after it is decoded.
  *                       If frame_type is equal to GST_AV1_INTRA_ONLY_FRAME, it is a requirement of bitstream conformance that
@@ -1192,6 +1206,15 @@ struct _GstAV1FilmGrainParams {
  * @use_superres: equal to 0 indicates that no upscaling is needed. use_superres equal to 1 indicates that upscaling is
  *                needed.
  * @coded_denom: is used to compute the amount of upscaling.
+ * @SuperresDenom: is the denominator of a fraction that specifies the ratio between the superblock width before and after
+ *                 upscaling. The numerator of this fraction is equal to the constant SUPERRES_NUM.
+ * @MiCols: is the number of 4x4 block columns in the frame.
+ * @MiRows: is the number of 4x4 block rows in the frame.
+ * @FrameWidth:
+ * @FrameHeight:
+ * @RenderWidth:
+ * @RenderHeight:
+ * @UpscaledWidth:
  * @is_filter_switchable: equal to 1 indicates that the filter selection is signaled at the block level;
  *                         is_filter_switchable equal to 0 indicates that the filter selection is signaled at the
  *                        frame level.
@@ -1207,9 +1230,11 @@ struct _GstAV1FilmGrainParams {
 struct _GstAV1FrameHeaderOBU {
   guint8 show_existing_frame;
   guint8 frame_to_show_map_idx;
+  guint32 frame_presentation_time;
   guint32 tu_presentation_delay;
   guint32 display_frame_id;
   GstAV1FrameType frame_type;
+  guint8 FrameIsIntra;
   guint8 show_frame;
   guint8 showable_frame;
   guint8 error_resilient_mode;
@@ -1220,8 +1245,8 @@ struct _GstAV1FrameHeaderOBU {
   guint8 frame_size_override_flag;
   guint32 order_hint;
   guint8 primary_ref_frame;
-  guint8 buffer_removal_delay_present;
-  guint32 buffer_removal_delay;
+  guint8 buffer_removal_time_present_flag;
+  guint32 buffer_removal_time[GST_AV1_MAX_OPERATING_POINTS];
   guint8 refresh_frame_flags;
   guint32 ref_order_hint[GST_AV1_NUM_REF_FRAMES];
   guint8 allow_intrabc;
@@ -1244,6 +1269,14 @@ struct _GstAV1FrameHeaderOBU {
   guint8 found_ref;
   guint8 use_superres;
   guint8 coded_denom;
+  guint32 UpscaledWidth;
+  guint32 FrameWidth;
+  guint32 FrameHeight;
+  guint32 MiCols;
+  guint32 MiRows;
+  guint32 RenderWidth;
+  guint32 RenderHeight;
+  guint32 SuperresDenom;
   guint8 is_filter_switchable;
   GstAV1InterpolationFilter interpolation_filter;
   GstAV1LoopFilterParams loop_filter_params;

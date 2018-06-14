@@ -39,6 +39,7 @@
 #define gst_av1_read_bit(br) gst_bit_reader_get_bits_uint8_unchecked(br, 1)
 #define gst_av1_read_bits(br, bits) gst_bit_reader_get_bits_uint32_unchecked(br, bits)
 #define gst_av1_bit_reader_skip(br, bits) gst_bit_reader_skip(br,bits)
+#define gst_bit_reader_skip_to_byte(br) gst_av1_bit_reader_skip_to_byte(br)
 
 GstAV1ParserResult gst_av1_bistreamfn_leb128(GstBitReader *br, guint64 *value)
 {
@@ -198,10 +199,10 @@ GstAV1ParserResult gst_av1_parse_decoder_model_info( GstBitReader *br, GstAV1Dec
 {
   decoder_model_info->bitrate_scale = gst_av1_read_bits(br,4);
   decoder_model_info->buffer_size_scale = gst_av1_read_bits(br,4);
-  decoder_model_info->encoder_decoder_buffer_delay_length_minus_1 = gst_av1_read_bits(br,5);
+  decoder_model_info->buffer_delay_length_minus_1 = gst_av1_read_bits(br,5);
   decoder_model_info->num_units_in_decoding_tick = gst_av1_read_bits(br,32);
-  decoder_model_info->buffer_removal_delay_length_minus_1 = gst_av1_read_bits(br,5);
-  decoder_model_info->frame_presentation_delay_length_minus_1 = gst_av1_read_bits(br,5);
+  decoder_model_info->buffer_removal_time_length_minus_1 = gst_av1_read_bits(br,5);
+  decoder_model_info->frame_presentation_time_length_minus_1 = gst_av1_read_bits(br,5);
 
   return GST_AV1_PARSE_OK;
 }
@@ -349,6 +350,8 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstBitReader *br, GstAV1Se
   gst_av1_parse_color_config(br,seq_header, &(seq_header->color_config));
 
   seq_header->film_grain_params_present = gst_av1_read_bit(br);
+
+  return gst_bit_reader_skip_to_byte(br);
 }
 
 GstAV1ParserResult gst_av1_parse_metadata_itut_t35( GstBitReader *br, GstAV1MetadataITUT_T35 *itut_t35)
@@ -458,6 +461,244 @@ GstAV1ParserResult gst_av1_parse_metadata_timecode( GstBitReader *br, GstAV1Meta
   }
 
   return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_metadata_obu(GstBitReader *br, GstAV1MetadataOBU *metadata)
+{
+  GstAV1ParserResult ret;
+
+  ret = gst_av1_bistreamfn_leb128(br,&(metadata->metadata_type));
+
+  if(ret == GST_AV1_PARSE_ERROR)
+    return GST_AV1_PARSE_ERROR;
+
+  switch(metadata->metadata_type)
+  {
+    case GST_AV1_METADATA_TYPE_ITUT_T35:
+      ret = gst_av1_parse_metadata_itut_t35(br,&(metadata->itut_t35));
+      break;
+    case GST_AV1_METADATA_TYPE_HDR_CLL:
+      ret = gst_av1_parse_metadata_hdr_cll(br,&(metadata->hdr_cll));
+      break;
+    case GST_AV1_METADATA_TYPE_HDR_MDCV:
+      ret = gst_av1_parse_metadata_hdr_mdcv(br,&(metadata->hdr_mdcv));
+      break;
+    case GST_AV1_METADATA_TYPE_SCALABILITY:
+      ret = gst_av1_parse_metadata_scalability(br,&(metadata->scalability));
+      break;
+    case GST_AV1_METADATA_TYPE_TIMECODE:
+      ret = gst_av1_parse_metadata_timecode(br,&(metadata->timecode));
+      break;
+    default:
+      return GST_AV1_PARSE_ERROR;
+  }
+
+  if(ret == GST_AV1_PARSE_OK)
+    return gst_bit_reader_skip_to_byte;
+  else
+    return GST_AV1_PARSE_ERROR;
+}
+
+
+GstAV1ParserResult gst_av1_parse_superres_params (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
+{
+  if(seq_header->enable_superres)
+    frame_header->use_superres = gst_av1_bit_read(br);
+  else
+    frame_header->use_superres = 0;
+
+  if(frame_header->use_superres) {
+    frame_header->coded_denom = gst_av1_read_bits(br, GST_AV1_SUPERRES_DENOM_BITS);
+    frame_header->SuperresDenom = coded_denom + SUPERRES_DENOM_MIN;
+  } else {
+    frame_header->SuperresDenom = SUPERRES_NUM;
+  }
+  frame_header->UpscaledWidth = frame_header->FrameWidth;
+  frame_header->FrameWidth = (frame_header->UpscaledWidth * SUPERRES_NUM + (frame_header->SuperresDenom / 2)) / frame_header->SuperresDenom;
+
+  // compute_image_size:
+  frame_header->MiCols = 2 * ( ( frame_header->FrameWidth + 7 ) >> 3 );
+  frame_header->MiRows = 2 * ( ( frame_header->FrameHeight + 7 ) >> 3 );
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_frame_size (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
+{
+  if(frame_header->frame_size_override_flag ) {
+    frame_header->frame_width_minus_1 = gst_av1_read_bits(br,seq_header->frame_width_bits_minus_1+1);
+    frame_header->frame_height_minus_1 = gst_av1_read_bits(br,seq_header->frame_height_bits_minus_1+1);
+    frame_header->FrameWidth = frame_header->frame_width_minus_1 + 1;
+    frame_header->FrameHeight = frame_header->frame_height_minus_1 + 1;
+  } else {
+    frame_header->FrameWidth = seq_header->max_frame_width_minus_1 + 1;
+    frame_header->FrameHeight= seq_header->max_frame_height_minus_1 + 1;
+  }
+  //TODO: superres_params()
+  //TODO: compute_image_size()
+
+  retrun GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_render_size (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header)
+{
+  frame_header->render_and_frame_size_different = gst_av1_read_bit(br);
+  if( frame_header->render_and_frame_size_different ) {
+    frame_header->render_width_minus_1 = gst_av1_read_bits(br,16);
+    frame_header->render_height_minus_1 = gst_av1_read_bits(br,16);
+    frame_header->RenderWidth = frame_header->render_width_minus_1 + 1;
+    frame_header->RenderHeight = frame_header->render_height_minus_1 + 1;
+  } else {
+    frame_header->RenderWidth = frame_header->UpscaledWidth;
+    frame_header->RenderHeight = frame_header->FrameHeight;
+  }
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
+{
+  if(seq_header->frame_id_number_present_flag)
+    int idLen = seq_header->additional_frame_id_length_minus_1 + seq_header->delta_frame_id_length_minus_2 + 3;
+
+  int allFrames = (1<<GST_AV1_NUM_REF_FRAMES) - 1;
+
+  if(seq_header->reduced_still_picture_header) {
+    frame_header->show_existing_frame = 0;
+    frame_header->frame_type = GST_AV1_KEY_FRAME;
+    frame_header->FrameIsIntra = 1;
+    frame_header->show_frame = 1;
+    frame_header->showable_frame = 0;
+  } else {
+    frame_header->show_existing_frame = gst_av1_read_bit(br);
+    if( frame_header->show_existing_frame ) {
+      frame_header->frame_to_show_map_idx = gst_av1_read_bits(br,3);
+      if( seq_header->decoder_model_info_present_flag && !seq_header->timing_info.equal_picture_interval )
+        frame_header->frame_presentation_time = gst_av1_read_bits(br,seq_header->decoder_model_info.frame_presentation_time_length_minus_1+1);
+      frame_header->refresh_frame_flags = 0;
+      if( seq_header->frame_id_numbers_present_flag ){
+        frame_header->display_frame_id = gst_av1_read_bits(br,idLen);
+      }
+
+      frame_header->frame_type frame_type = RefFrameType[ frame_to_show_map_idx ] // TODO: RefFrameType not available in the scope yet!!!
+
+      if ( frame_header->frame_type == GST_AV1_KEY_FRAME ) {
+         frame_header->refresh_frame_flags = allFrames;
+      }
+      if ( seq_header->film_grain_params_present ) {
+      //load_grain_params( frame_to_show_map_idx ) //TODO: load_grain_params
+      }
+      return GST_AV1_PARSE_OK;
+    }
+
+    frame_header->frame_type = gst_av1_read_bits(br,2);
+    frame_header->FrameIsIntra = (frame_header->frame_type == GST_AV1_INTRA_ONLY_FRAME ||
+                                  frame_header->frame_type == GST_AV1_KEY_FRAME);
+    frame_header->show_frame = gst_av1_read_bit(br);
+    if( frame_header->show_frame && seq_header->decoder_model_info_present_flag && !seq_header->timing_info.equal_picture_interval )
+      frame_header->frame_presentation_time = gst_av1_read_bits(br,seq_header->decoder_model_info.frame_presentation_time_length_minus_1+1);
+
+    if(frame_header->show_frame )
+      frame_header->showable_frame = 0;
+    else
+      frame_header->showable_frame = gst_av1_read_bit(br);
+
+    if(frame_header->frame_type == GST_AV1_SWITCH_FRAME || (frame_header->frame_type == GST_AV1_KEY_FRAME && frame_header->show_frame))
+      frame_header->error_resilient_mode = 1;
+    else
+      frame_header->error_resilient_mode = gst_av1_reat_bit(br);
+  }
+  /* RefValid, RefOrderHint, OrderHints not available yet
+  if ( frame_header->frame_type == KEY_FRAME && frame_header->show_frame ) {
+    for ( int i = 0; i < GST_AV1_NUM_REF_FRAMES; i++ ) {
+      RefValid[ i ] = 0
+      RefOrderHint[ i ] = 0
+    }
+    for ( int i = 0; i < GST_AV1_REFS_PER_FRAME; i++ ) {
+      OrderHints[ LAST_FRAME + i ] = 0
+    }
+  }
+  */
+  frame_header->disable_cdf_update = gst_av1_bit_read(br);
+
+  if ( seq_header->seq_force_screen_content_tools == GST_AV1_SELECT_SCREEN_CONTENT_TOOLS ) {
+    frame_header->allow_screen_content_tools = gst_av1_bit_read(br);
+  } else {
+    frame_header->allow_screen_content_tools = seq_header->seq_force_screen_content_tools;
+  }
+
+  if ( frame_header->allow_screen_content_tools ) {
+    if ( seq_header->seq_force_integer_mv == GST_AV1_SELECT_INTEGER_MV ) {
+      force_integer_mv = gst_av1_bit_read(br)
+    } else {
+      frame_header->force_integer_mv = seq_header->seq_force_integer_mv;
+    }
+  } else {
+    frame_header->force_integer_mv = 0
+  }
+
+  if ( frame_header->FrameIsIntra ) {
+    frame_header->force_integer_mv = 1
+  }
+
+  if( seq_header->frame_id_numbers_present_flag ) {
+    //PrevFrameID = current_frame_id
+    frame_header->current_frame_id = gst_av1_read_bits(br,idLen);
+    mark_ref_frames(idLen); //TODO: Mark Ref Frames
+  } else {
+    frame_header->current_frame_id = 0;
+  }
+  if( frame_header->frame_type == GST_AV1_SWITCH_FRAME) {
+    frame_header->frame_size_override_flag = 1;
+  } else if ( seq_header->reduced_still_picture_header ) {
+    frame_header->frame_size_override_flag = 0;
+  } else {
+    frame_header->frame_size_override_flag = gst_av1_read_bit(br);
+  frame_header->order_hint = gst_av1_read_bits(br,seq_header->order_hint_bits_minus_1+1);
+  //OrderHint = order_hint
+
+  if ( frame_header->FrameIsIntra || frame_header->error_resilient_mode ) {
+    frame_header->primary_ref_frame = GST_AV1_PRIMARY_REF_NONE;
+  } else {
+    frame_header->primary_ref_frame = gst_av1_read_bits(br,3);
+  }
+
+  if ( seq_header->decoder_model_info_present_flag ) {
+    frame_header->buffer_removal_time_present_flag = gst_av1_read_bit(br);
+    if ( frame_header->buffer_removal_time_present_flag ) {
+      for ( int opNum = 0; opNum <= operating_points_cnt_minus_1; opNum++ ) {
+        if ( seq_header->decoder_model_info.decoder_model_present_for_this_op[ opNum ] ) {
+          int opPtIdc = seq_header->operating_points[ opNum ].idc;
+          int inTemporalLayer = ( opPtIdc >> temporal_id ) & 1
+          int inSpatialLayer = ( opPtIdc >> ( spatial_id + 8 ) ) & 1
+          if ( opPtIdc == 0 || ( inTemporalLayer && inSpatialLayer ) )
+            buffer_removal_time = gst_av1_read_bits(br,seq_header->decoder_model_info.buffer_removal_time_length_minus_1+1);
+        }
+      }
+    }
+  }
+
+  frame_header->allow_high_precision_mv = 0;
+  frame_header->use_ref_frame_mvs = 0;
+  frame_header->allow_intrabc = 0;
+  if ( frame_header->frame_type == GST_AV1_SWITCH_FRAME ||
+     ( frame_header->frame_type == GST_AV1_KEY_FRAME && frame_header->show_frame ) ) {
+    frame_header->refresh_frame_flags = allFrames;
+  } else {
+    frame_header->refresh_frame_flags = gst_av1_read_bits(br,8);
+ }
+
+ if ( !frame_header->FrameIsIntra || frame_header->refresh_frame_flags != allFrames ) {
+   if ( frame_header->error_resilient_mode && seq_header->enable_order_hint ) {
+     for ( int i = 0; i < GST_AV1_NUM_REF_FRAMES; i++) {
+       frame_header->ref_order_hint[i] = gst_av1_read_bits(br,seq_header->order_hint_bits_minus_1+1);
+      // if ( ref_order_hint[ i ] != RefOrderHint[ i ] )
+      //   RefValid[ i ] = 0
+     }
+   }
+ }
+
+
 }
 
 GstAV1ParserResult gst_av1_parse_tile_list_obu( GstBitReader *br, GstAV1TileListOBU *tile_list)
