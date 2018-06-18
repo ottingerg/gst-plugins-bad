@@ -68,6 +68,7 @@ G_BEGIN_DECLS
 #define GST_AV1_SUPERRES_NUM 8
 #define GST_AV1_SUPERRES_DENOM_MIN 9
 #define GST_AV1_SUPERRES_DENOM_BITS 3
+#define GST_AV1_MAX_LOOP_FILTER 63
 
 /**
  * GstAV1ParserResult:
@@ -291,10 +292,10 @@ typedef enum {
  */
 typedef enum {
   GST_AV1_INTERPOLATION_FILTER_EIGHTTAP = 0,
-  GST_AV1_INTERPOLATIONG_FILTER_EIGHTTAP_SMOOTH = 1,
-  GST_AV1_INTERPOLATIONG_FILTER_EIGHTTAP_SHARP = 2,
-  GST_AV1_INTERPOLATIONG_FILTER_BILINEAR = 3,
-  GST_AV1_INTERPOLATIONG_FILTER_SWITCHABLE = 4,
+  GST_AV1_INTERPOLATION_FILTER_EIGHTTAP_SMOOTH = 1,
+  GST_AV1_INTERPOLATION_FILTER_EIGHTTAP_SHARP = 2,
+  GST_AV1_INTERPOLATION_FILTER_BILINEAR = 3,
+  GST_AV1_INTERPOLATION_FILTER_SWITCHABLE = 4,
 } GstAV1InterpolationFilter;
 
 /**
@@ -444,7 +445,7 @@ struct _GstAV1TimingInfo {
 };
 
 /**
- * _GstAV1TimingInfo:
+ * _GstAV1ColorConfig:
  *
  * @high_bitdepth and twelve_bit: are syntax elements which, together with seq_profile, determine the bit depth.
  * @mono_chrome: equal to 1 indicates that the video does not contain U and V color planes. mono_chrome equal to 0
@@ -879,12 +880,12 @@ struct _GstAV1LoopFilterParams {
  */
 struct _GstAV1QuantizationParams {
   guint8 base_q_idx;
-  guint8 DeltaQYDc;
+  gint8 DeltaQYDc;
   guint8 diff_uv_delta;
-  guint8 DeltaQUDc;
-  guint8 DeltaQUAc;
-  guint8 DeltaQVDc;
-  guint8 DeltaQVAc;
+  gint8 DeltaQUDc;
+  gint8 DeltaQUAc;
+  gint8 DeltaQVDc;
+  gint8 DeltaQVAc;
   guint8 using_qmatrix;
   guint8 qm_y;
   guint8 qm_u;
@@ -910,7 +911,10 @@ struct _GstAV1QuantizationParams {
  * @FeatureEnabled[]: equal to 0 indicates that the corresponding feature is unused and has value equal to 0.
  *                    FeatureEnabled[] equal to 1 indicates that the feature value is coded in the bitstream.
  * @FeatureValue[]: specifies the feature data for a segment feature.
- *
+ * @SegIdPreSkip: equal to 1 indicates that the segment id will be read before the skip syntax element. SegIdPreSkip
+ *                equal to 0 indicates that the skip syntax element will be read first.
+ * @LastActiveSegId: indicates the highest numbered segment id that has some enabled feature. This is used when decoding
+ *                   the segment id to only decode choices corresponding to used segments.
  */
 
 
@@ -921,6 +925,8 @@ struct _GstAV1SegmenationParams {
   guint8 segmentation_update_data;
   guint8 FeatureEnabled[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
   guint8 FeatureData[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
+  guint8 SegIdPreSkip;
+  guint8 LastActiveSegId;
 };
 
 
@@ -1224,7 +1230,24 @@ struct _GstAV1FilmGrainParams {
  * @reference_select: equal to 1 specifies that the mode info for inter blocks contains the syntax element comp_mode that
  *                    indicates whether to use single or compound reference prediction. Reference_select equal to 0
  *                    specifies that all interblocks will use single prediction.
- *
+ * @expectedFrameId[]: specifies the frame id for each frame used for reference. It is a requirement of bitstream conformance
+ *                     that whenever expectedFrameId[ i ] is calculated, the value matches RefFrameId[ ref_frame_idx[ i ] ]
+ *                     (this contains the value of current_frame_id at the time that the frame indexed by ref_frame_idx was stored).
+ * @RefFrameHeight[]:
+ * @RefRenderHeight[]:
+ * @RefUpscaledWidth[]:
+ * @RefRenderWidth[]:
+ * @OrderHints[]: specifies the expected output order for each reference frame.
+ * @RefFrameSignBias[]: specifies the intended direction of the motion vector in time for each reference frame. A sign bias
+ *                      equal to 0 indicates that the reference frame is a forwards reference (i.e. the reference frame is expected
+ *                      to be output before the current frame); a sign bias equal to 1 indicates that the reference frame is a backwards
+ *                      reference.
+ * @CodedLossless: is a variable that is equal to 1 when all segments use lossless encoding. This indicates that the frame is
+ *                 fully lossless at the coded resolution of FrameWidth by FrameHeight. In this case, the loop filter and CDEF filter
+ *                 are disabled.
+ * @AllLossless: is a variable that is equal to 1 when CodedLossless is equal to 1 and FrameWidth is equal to UpscaledWidth.
+ *               This indicates that the frame is fully lossless at the upscaled resolution. In this case, the loop filter, CDEF filter, and
+ *               loop restoration are disabled.
  */
 
 struct _GstAV1FrameHeaderOBU {
@@ -1290,6 +1313,16 @@ struct _GstAV1FrameHeaderOBU {
   guint8 skip_mode_present;
   guint8 reference_select;
   GstAV1GlobalMotionParams global_motion_params;
+  guint32 expectedFrameId[GST_AV1_REFS_PER_FRAME];
+  guint32 RefUpscaledWidth[GST_AV1_REFS_PER_FRAME];
+  guint32 RefFrameHeight[GST_AV1_REFS_PER_FRAME];
+  guint32 RefRenderWidth[GST_AV1_REFS_PER_FRAME];
+  guint32 RefRenderHeight[GST_AV1_REFS_PER_FRAME];
+  guint32 RefOrderHint[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
+  guint32 OrderHints[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
+  guint32 RefFrameSignBias[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
+  guint8 CodedLossless;
+  guint8 AllLossless;
 };
 
 /**
