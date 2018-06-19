@@ -818,10 +818,214 @@ GstAV1ParserResult gst_av1_parse_cdef_params (GstBitReader *br, GstAV1CDEFParams
 
 GstAV1ParserResult gst_av1_parse_loop_restoration_params (GstBitReader *br, GstAV1LoopRestorationParams *lr_params, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
+  const GstAV1FrameRestorationType Remap_Lr_Type[4] = {
+    GST_AV1_FRAME_RESTORE_NONE,
+    GST_AV1_FRAME_RESTORE_SWITCHABLE,
+    GST_AV1_FRAME_RESTORE_WIENER,
+    GST_AV1_FRAME_RESTORE_SGRPROJ
+  };
+
+  if ( frame_header->AllLossless || frame_header->allow_intrabc || seq_header-> !enable_restoration ) {
+    lr_params->FrameRestorationType[0] = GST_AV1_FRAME_RESTORE_NONE;
+    lr_params->FrameRestorationType[0] = GST_AV1_FRAME_RESTORE_NONE;
+    lr_params->FrameRestorationType[0] = GST_AV1_FRAME_RESTORE_NONE;
+    lr_params->UsesLr = 0;
+    return GST_AV1_PARSE_OK;
+  }
+
+  lr_params->UsesLr = 0
+  lr_params->usesChromaLr = 0
+  for (int i = 0; i < seq_header->color_config.NumPlanes; i++ ) {
+    lr_params->lr_type = gst_av1_read_bits(br,2);
+    lr_params->FrameRestorationType[i] = Remap_Lr_Type[lr_params->lr_type];
+    if ( lr_params->FrameRestorationType[i] != GST_AV1_FRAME_RESTORE_NONE ) {
+      lr_params->UsesLr = 1;
+      if ( i > 0 ) {
+        lr_params->usesChromaLr = 1;
+      }
+    }
+  }
+
+  if ( lr_params->UsesLr ) {
+    if ( seq_header->use_128x128_superblock ) {
+      lr_params->lr_unit_shift = gst_av1_read_bit(br);
+      lr_params->lr_unit_shift++
+    } else {
+      lr_params->lr_unit_shift = gst_av1_read_bit(br);
+      if ( lr_params->lr_unit_shift ) {
+        lr_params->lr_unit_extra_shift = gst_av1_read_bit(br);
+        lr_params->lr_unit_shift += lr_params->lr_unit_extra_shift;
+      }
+    }
+
+    lr_params->LoopRestorationSize[ 0 ] = GST_AV1_RESTORATION_TILESIZE_MAX >> (2 - lr_params->lr_unit_shift)
+    if ( seq_header->color_config.subsampling_x && seq_header->color_config.subsampling_y && lr_params->usesChromaLr ) {
+      lr_params->lr_uv_shift = gst_av1_read_bit(br);
+    } else {
+      lr_params->lr_uv_shift = 0;
+    }
+
+    lr_params->LoopRestorationSize[ 1 ] = lr_params->LoopRestorationSize[ 0 ] >> lr_params->lr_uv_shift;
+    lr_params->LoopRestorationSize[ 2 ] = lr_params->LoopRestorationSize[ 0 ] >> lr_params->lr_uv_shift;
+  }
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_tx_mode (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header)
+{
+  if ( frame_header->CodedLossless == 1 ) {
+    frame_header->TxMode =  GST_AV1_TX_MODE_ONLY_4X4;
+  } else {
+    frame_header->tx_mode_select = gst_av1_read_bit(br);
+    if ( frame_header->tx_mode_select ) {
+      frame_header->TxMode = GST_AV1_TX_MODE_SELECT;
+    } else {
+      frame_header->TxMode = GST_AV1_TX_MODE_LARGEST;
+    }
+  }
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_loop_restoration_params (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header)
+{
+  int skipModeAllowed = 0;
+
+  if( frame_header->FrameIsIntra || !frame_header->reference_select || !frame_header->enable_order_hint ) {
+    frame_header->skipModeAllowed = 0;
+  } else {
+    int forwardIdx = -1;
+    int forwardHint = 0;
+    int backwardIdx = -1;
+    int backwardHint = 0;
+    int refHint = 0;
+
+    for ( int i = 0; i < GST_AV1_REFS_PER_FRAME; i++ ) {
+      refHint = frame_header->RefOrderHint[frame_header->ref_frame_idx[i]];
+      if ( gst_av1_get_relative_dist( refHint, frame_header->OrderHint ) < 0 ) {
+        if ( forwardIdx < 0 || gst_av1_get_relative_dist( refHint, forwardHint) > 0 ) {
+          forwardIdx = i;
+          forwardHint = refHint
+        }
+      } else if ( gst_av1_get_relative_dist( refHint, frame_header->OrderHint) > 0 ) {
+        if ( backwardIdx < 0 || gst_av1_get_relative_dist( refHint, backwardHint) < 0 ) {
+          backwardIdx = i
+          backwardHint = refHint
+        }
+      }
+    }
+
+    if ( forwardIdx < 0 ) {
+      skipModeAllowed = 0;
+    } else if ( backwardIdx >= 0 ) {
+      skipModeAllowed = 1;
+      frame_header->SkipModeFrame[ 0 ] = GST_AV1_LAST_FRAME + Min(forwardIdx, backwardIdx);
+      frame_header->SkipModeFrame[ 1 ] = GST_AV1_LAST_FRAME + Max(forwardIdx, backwardIdx);
+    } else {
+      int secondForwardIdx = -1;
+      int secondForwardHint = 0;
+      for ( int i = 0; i < GST_AV1_REFS_PER_FRAME; i++ ) {
+        refHint = frame_header->RefOrderHint[ frame_header->ref_frame_idx[ i ] ];
+        if ( gst_av1_get_relative_dist( refHint, forwardHint ) < 0 ) {
+          if ( secondForwardIdx < 0 || get_relative_dist( refHint, secondForwardHint ) > 0 ) {
+            secondForwardIdx = i;
+            secondForwardHint = refHint;
+          }
+        }
+      }
+
+      if ( secondForwardIdx < 0 ) {
+        skipModeAllowed = 0;
+      } else {
+        skipModeAllowed = 1;
+        frame_header->SkipModeFrame[ 0 ] = GST_AV1_LAST_FRAME + Min(forwardIdx, secondForwardIdx);
+        frame_header->SkipModeFrame[ 1 ] = GST_AV1_LAST_FRAME + Max(forwardIdx, secondForwardIdx);
+      }
+    }
+  }
+
+  if ( skipModeAllowed ) {
+    frame_header->skip_mode_present = gst_av1_read_bit(br);
+  } else {
+    frame_header->skip_mode_present = 0;
+  }
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_global_param (GstBitReader *br, GstAV1GlobalMotionParams *gm_params,GstAV1FrameHeaderOBU *frame_header,GstAV1WarpModelType type ,int ref, int idx) {
+  int absBits = GST_AV1_GM_ABS_ALPHA_BITS;
+  int precBits = GST_AV1_GM_ALPHA_PREC_BITS;
+
+  if ( idx < 2 ) {
+    if ( type == GST_AV1_WARP_MODEL_TRANSLATION ) {
+      absBits = GST_AV1_GM_ABS_TRANS_ONLY_BITS - (frame_header->allow_high_precision_mv ? 0 : 1);
+      precBits = GST_AV1_GM_TRANS_ONLY_PREC_BITS - (frame_header->allow_high_precision_mv ? 0 : 1);
+    } else {
+      absBits = GST_AV1_GM_ABS_TRANS_BITS;
+      precBits = GST_AV1_GM_TRANS_PREC_BITS;
+    }
+  }
+
+  int precDiff = GST_AV1_WARPEDMODEL_PREC_BITS - precBits;
+  int wm_round = (idx % 3) == 2 ? (1 << GST_AV1_WARPEDMODEL_PREC_BITS) : 0;
+  int sub = (idx % 3) == 2 ? (1 << precBits) : 0;
+  int mx = (1 << absBits)
+  //int r = (PrevGmParams[ref][idx] >> precDiff) - sub; //TODO: PrevGMParams is missing
+  int r; //Hack-Warning PrevGmParams are not supported yet - bits for reading are defined with mx parameter
+  gm_params->gm_params[ref][idx] = (gst_av1_decode_signed_subexp_with_ref(br,-mx, mx + 1, r )<< precDiff) + wm_round;
+
+  return GST_AV1_PARSE_OK;
+}
 
 
-// Continue here !!!
+GstAV1ParserResult gst_av1_parse_global_motion_params (GstBitReader *br, GstAV1GlobalMotionParams *gm_params, GstAV1FrameHeaderOBU *frame_header)
+{
+  GstAV1WarpModelType type;
 
+  for ( int ref = GST_AV1_LAST_FRAME; ref <= GST_AV1_ALTREF_FRAME; ref++ ) {
+    gm_params->GmType[ ref ] = GST_AV1_WARP_MODEL_IDENTITY;
+    for ( int i = 0; i < 6; i++ ) {
+      gm_params->gm_params[ ref ][ i ] = ( ( i % 3 == 2 ) ? 1 << GST_AV1_WARPEDMODEL_PREC_BITS : 0 )
+    }
+
+  if ( frame_header->FrameIsIntra )
+    return GST_AV1_PARSE_OK;
+
+  for ( int ref = GST_AV1_LAST_FRAME; ref <= GST_AV1_ALTREF_FRAME; ref++ ) {
+    gm_params->is_global[ref] = gst_av1_read_bit(br);
+    if ( gm_params->is_global[ref] ) {
+      gm_params->is_rot_zoom[ref] = gst_av1_read_bit(br);
+      if ( gm_params->is_rot_zoom[ref] ) {
+        type = GST_AV1_WARP_MODEL_ROTZOOM;
+      } else {
+        gm_params->is_translation[ref] = gst_av1_read_bit(br);
+        type = gm_params->is_translation[ref] ? GST_AV1_WARP_MODEL_TRANSLATION : GST_AV1_WARP_MODEL_AFFINE;
+      }
+    } else {
+      type = GST_AV1_WARP_MODEL_IDENTITY;
+    }
+    gm_params->GmType[ref] = type;
+
+    if ( type >= GST_AV1_WARP_MODEL_ROTZOOM ) {
+      gst_av1_read_global_param(gm_params,type,ref,2);
+      gst_av1_read_global_param(gm_params,type,ref,3);
+      if ( type == GST_AV1_WARP_MODEL_AFFINE ) {
+        gst_av1_read_global_param(gm_params,type,ref,4);
+        gst_av1_read_global_param(gm_params,type,ref,5);
+      } else {
+        gm_params->gm_params[ref][4] = gm_params->gm_params[ref][3]*(-1);
+        gm_params->gm_params[ref][5] = gm_params->gm_params[ref][2];
+      }
+    }
+    if ( type >= GST_AV1_WARP_MODEL_TRANSLATION ) {
+      gst_av1_read_global_param(gm_params,type,ref,0);
+      gst_av1_read_global_param(gm_params,type,ref,1);
+    }
+  }
+
+  return GST_AV1_PARSE_OK;
+}
 
 
 GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)

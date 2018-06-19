@@ -69,6 +69,10 @@ G_BEGIN_DECLS
 #define GST_AV1_SUPERRES_DENOM_MIN 9
 #define GST_AV1_SUPERRES_DENOM_BITS 3
 #define GST_AV1_MAX_LOOP_FILTER 63
+#define GST_AV1_MAX_NUM_PLANES 3
+#define GST_AV1_GM_ABS_TRANS_BITS 12
+#define GST_AV1_GM_ABS_TRANS_ONLY_BITS 9
+#define GST_AV1_GM_ABS_ALPHA_BITS 12
 
 /**
  * GstAV1ParserResult:
@@ -307,6 +311,34 @@ typedef enum {
   GST_AV1_TX_MODE_LARGEST = 1,
   GST_AV1_TX_MODE_SELECT = 2,
 } GstAV1TXModes;
+
+
+/**
+ * GstAV1FrameRestorationType:
+ *
+ */
+typedef enum {
+  GST_AV1_FRAME_RESTORE_NONE = 0,
+  GST_AV1_FRAME_RESTORE_WIENER = 1,
+  GST_AV1_FRAME_RESTORE_SGRPROJ = 2,
+  GST_AV1_FRAME_RESTORE_SWITCHABLE = 3,
+} GstAV1FrameRestorationType;
+
+
+/**
+ * GstAV1WarpModelType:
+ *
+ * GST_AV1_WARP_MODEL_IDENTITY: Warp model is just an identity transform
+ * GST_AV1_WARP_MODEL_TRANSLATION: Warp model is a pure translation
+ * GST_AV1_WARP_MODEL_ROTZOOM: Warp model is a rotation + symmetric zoom + translation
+ * GST_AV1_WARP_MODEL_AFFINE: Warp model is a general affine transform
+ */
+typedef enum {
+  GST_AV1_WARP_MODEL_IDENTITY = 0,
+  GST_AV1_WARP_MODEL_TRANSLATION = 1,
+  GST_AV1_WARP_MODEL_ROTZOOM = 2,
+  GST_AV1_WARP_MODEL_AFFINE = 3,
+} GstAV1WarpModelType;
 
 /**
  * _GstAV1OBUHeader:
@@ -980,7 +1012,11 @@ struct _GstAV1CDEFParams {
  * @lr_type: specifies the type of restoration for each plane
  * @lr_unit_shift: specifies if the luma restoration size should be halved.
  * @lr_unit_extra_shift: specifies if the luma restoration size should be halved again.
- * @lr_uv_shift: is only present for 4:2:0 formats and specifies if the chroma size should be half the luma size. * @
+ * @lr_uv_shift: is only present for 4:2:0 formats and specifies if the chroma size should be half the luma size.
+ * @UsesLr: indicates if any plane uses loop restoration.
+ * @usesChromaLr: indicates if chroma plane(s) use loop restoration.
+ * @FrameRestorationType[]: specifies the type of restoration used for each plane.
+ * @LoopRestorationSize[]: specifies the size of loop restoration units in units of samples in the current plane.
  *
  */
 
@@ -989,6 +1025,11 @@ struct _GstAV1LoopRestorationParams {
   guint8 lr_unit_shift;
   guint8 lr_unit_extra_shift;
   guint8 lr_uv_shift;
+  guint8 usesChromaLr;
+  guint8 UsesLr;
+  GstAV1FrameRestorationType FrameRestorationType[GST_AV1_MAX_NUM_PLANES];
+  guint32 LoopRestorationSize[GST_AV1_MAX_NUM_PLANES];
+
 };
 
 /**
@@ -1003,6 +1044,9 @@ struct _GstAV1GlobalMotionParams {
   guint8 is_global[GST_AV1_NUM_REF_FRAMES];
   guint8 is_rot_zoom[GST_AV1_NUM_REF_FRAMES];
   guint8 is_translation[GST_AV1_NUM_REF_FRAMES];
+  GstAV1WarpModelType GmType[GST_AV1_NUM_REF_FRAMES];
+  gint32 gm_params[GST_AV1_NUM_REF_FRAMES][6];
+
 };
 
 /**
@@ -1248,6 +1292,7 @@ struct _GstAV1FilmGrainParams {
  * @AllLossless: is a variable that is equal to 1 when CodedLossless is equal to 1 and FrameWidth is equal to UpscaledWidth.
  *               This indicates that the frame is fully lossless at the upscaled resolution. In this case, the loop filter, CDEF filter, and
  *               loop restoration are disabled.
+ * @SkipModeFrame[]: specifies the frames to use for compound prediction when skip_mode is equal to 1.
  */
 
 struct _GstAV1FrameHeaderOBU {
@@ -1323,6 +1368,9 @@ struct _GstAV1FrameHeaderOBU {
   guint32 RefFrameSignBias[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
   guint8 CodedLossless;
   guint8 AllLossless;
+  guint8 SkipModeFrame[2]; // is 2 appropiat?
+
+
 };
 
 /**
