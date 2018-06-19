@@ -1050,7 +1050,7 @@ struct _GstAV1GlobalMotionParams {
 };
 
 /**
- * _GstAV1GlobalMotionParams:
+ * _GstAV1FilmGrainParams:
  *
  * @apply_grain: equal to 1 specifies that film grain should be added to this frame. apply_grain equal to 0
  *               specifies that film grain should not be added.

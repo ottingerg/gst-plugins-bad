@@ -41,6 +41,8 @@
 #define gst_av1_bit_reader_skip(br, bits) gst_bit_reader_skip(br,bits)
 #define gst_bit_reader_skip_to_byte(br) gst_av1_bit_reader_skip_to_byte(br)
 
+
+//TODO - guint64 Pointer is dangerous ?? (if other type is used?)
 GstAV1ParserResult gst_av1_bistreamfn_leb128(GstBitReader *br, guint64 *value)
 {
   char leb128_byte;
@@ -60,6 +62,7 @@ GstAV1ParserResult gst_av1_bistreamfn_leb128(GstBitReader *br, guint64 *value)
     return GST_AV1_PARSER_ERROR;
 }
 
+//TODO - guint32 Pointer is dangerous ?? (if other type is used?)
 GstAV1ParserResult gst_av1_bistreamfn_uvlc(GstBitReader *br, guint32 *value)
 {
   int leadingZero = 0;
@@ -86,9 +89,11 @@ GstAV1ParserResult gst_av1_bistreamfn_uvlc(GstBitReader *br, guint32 *value)
   return GST_AV1_PARSER_OK;
 }
 
+//TODO - gint8 Pointer is dangerous ?? (if other type is used?)
+
 GstAV1ParserResult gst_av1_bistreamfn_su(GstBitReader *br, guint8 n , gint8 *value)
 {
-    guint8 v,signMask;
+    int v,signMask;
 
     v = gst_av1_read_bits(br,n);
     signMask = 1 << (n-1);
@@ -101,6 +106,29 @@ GstAV1ParserResult gst_av1_bistreamfn_su(GstBitReader *br, guint8 n , gint8 *val
 }
 
 
+int gst_av1_helpers_FloorLog2( x ) {
+  int s = 0;
+
+  while ( x != 0 ) {
+    x = x >> 1;
+    s++;
+  }
+  return s - 1;
+}
+
+
+//TODO - gint8 Pointer is dangerous ?? (if other type is used?)
+
+GstAV1ParserResult gst_av1_bitstreamfn_ns(GstBitReader *br, guint8 n , gint8 *value)
+{
+  int w = gst_av1_helpers_FloorLog2(n) + 1;
+  int m = (1 << w) - n;
+  int v = gst_av1_read_bits(br,w-1);
+  if ( v < m )
+    return v;
+  int extra_bit = gst_av1_read_bit(br);
+  return (v << 1) - m + extra_bit;
+}
 
 GstAV1ParserResult gst_av1_parse_obu_header( GstBitReader *br, GstAV1OBUHeader *obu_header)
 {
@@ -716,6 +744,50 @@ GstAV1ParserResult gst_av1_parse_segmentation_params (GstBitReader *br, GstAV1Se
   return GST_AV1_PARSE_OK;
 }
 
+int gst_av1_helper_tile_log2( int blkSize, int target ) {
+  int k;
+  for ( k = 0; (blkSize << k) < target; k++ ) {
+  }
+  return k;
+}
+
+GstAV1ParserResult gst_av1_parse_tile_info (GstBitReader *br, GstAV1TileInfo *tile_info, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
+{
+
+  //TODO: Which values should be moved into GstAV1TileInfo? -> decide accordingly to spec 6.8.14
+  int sbCols = seq_header->use_128x128_superblock ? ( ( frame_header->MiCols + 31 ) >> 5 ) : ( ( frame_header->MiCols + 15 ) >> 4 );
+  int sbRows = seq_header->use_128x128_superblock ? ( ( frame_header->MiRows + 31 ) >> 5 ) : ( ( frame_header->MiRows + 15 ) >> 4 );
+  int sbShift = seq_header->use_128x128_superblock ? 5 : 4;
+  int sbSize = sbShift + 2;
+  int maxTileWidthSb = GST_AV1_MAX_TILE_WIDTH >> sbSize;
+  int maxTileAreaSb = GST_AV1_MAX_TILE_AREA >> ( 2 * sbSize );
+  int minLog2TileCols = gst_av1_tile_log2(maxTileWidthSb, sbCols);
+  int maxLog2TileCols = gst_av1_tile_log2(1, Min(sbCols, MAX_TILE_COLS));
+  int maxLog2TileRows = gst_av1_tile_log2(1, Min(sbRows, MAX_TILE_ROWS));
+  int minLog2Tiles = Max(minLog2TileCols,gst_av1_tile_log2(maxTileAreaSb, sbRows * sbCols));
+  int increment_tile_cols_log2;
+
+  tile_info->uniform_tile_spacing_flag = gst_av1_read_bit(br);
+  if ( tile_info->uniform_tile_spacing_flag ) {
+    tile_info->TileColsLog2 = minLog2TileCols;
+     while ( tile_info->TileColsLog2 < maxLog2TileCols ) {
+     increment_tile_cols_log2 = gst_av1_read_bit(br);
+     if ( increment_tile_cols_log2 == 1 )
+       tile_info->TileColsLog2++;
+     else
+       break;
+  }
+  int tileWidthSb = (sbCols + (1 << TileColsLog2) - 1) >> TileColsLog2
+  i = 0
+  for ( startSb = 0; startSb < sbCols; startSb += tileWidthSb ) {
+  MiColStarts[ i ] = startSb << sbShift
+  i += 1
+  }
+  MiColStarts[i] = MiCols
+  TileCols = i
+
+
+}
 
 GstAV1ParserResult gst_av1_parse_loop_filter_params (GstBitReader *br, GstAV1LoopFilterParams *lf_params, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
@@ -953,6 +1025,59 @@ GstAV1ParserResult gst_av1_parse_loop_restoration_params (GstBitReader *br, GstA
   return GST_AV1_PARSE_OK;
 }
 
+int gst_av1_inverse_recenter( int r, int v ) {
+  if ( v > 2 * r )
+    return v;
+  else if ( v & 1 )
+    return r - ((v + 1) >> 1);
+  else
+    return r + (v >> 1);
+}
+
+int gst_av1_decode_subexp( GstBitReader *br, int numSyms ) {
+  int i = 0;
+  int mk = 0;
+  int k = 3;
+  int subexp_final_bits = 0;
+  int subexp_more_bits = 0;
+  int subexp_bits = 0;
+
+//TODO: can while(1) be dangerous??
+  while ( 1 ) {
+    int b2 = i ? k + i - 1 : k;
+    int a = 1 << b2;
+    if ( numSyms <= mk + 3 * a ) {
+      gst_av1_bitstreamfn_ns(br, numSyms - mk, &subexp_final_bits);
+      return subexp_final_bits + mk;
+    } else {
+      subexp_more_bits = gst_av1_read_bit(br);
+      if ( subexp_more_bits ) {
+        i++;
+        mk += a;
+      } else {
+        subexp_bits  = gst_av1_read_bits(br,b2);
+        return subexp_bits + mk;
+      }
+    }
+  }
+}
+
+
+int gst_av1_decode_unsigned_subexp_with_ref( GstBitReader *br, mx, r ) {
+  int v = gst_av1_decode_subexp( br, mx )
+  if ( (r << 1) <= mx ) {
+    return gst_av1_inverse_recenter(r, v);
+  } else {
+    return mx - 1 - gst_av1_inverse_recenter(mx - 1 - r, v);
+  }
+}
+
+int gst_av1_decode_signed_subexp_with_ref(GstBitReader *br, int low, int high, int r) {
+  return gst_av1_decode_unsigned_subexp_with_ref(br, high - low, r - low) + low;
+}
+
+
+//Hack-Warning: PrevGMParams[] are not implemented yet - parser should read right amount of bits, but value will be wrong.
 GstAV1ParserResult gst_av1_parse_global_param (GstBitReader *br, GstAV1GlobalMotionParams *gm_params,GstAV1FrameHeaderOBU *frame_header,GstAV1WarpModelType type ,int ref, int idx) {
   int absBits = GST_AV1_GM_ABS_ALPHA_BITS;
   int precBits = GST_AV1_GM_ALPHA_PREC_BITS;
@@ -1027,6 +1152,111 @@ GstAV1ParserResult gst_av1_parse_global_motion_params (GstBitReader *br, GstAV1G
   return GST_AV1_PARSE_OK;
 }
 
+
+GstAV1ParserResult gst_av1_parse_film_grain_params (GstBitReader *br, GstAV1FilmGrainParams *fg_params, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
+{
+  if(!seq_header->film_grain_params_present || !frame_header->show_frame && !frame_header->showable_frame) {
+    //reset_grain_params() //TODO: implement reset_grain_params
+    return GST_AV1_PARSE_OK;
+  }
+
+  fg_params->apply_grain = gst_av1_read_bit(br);
+
+  if ( !fg_params->apply_grain ) {
+    //reset_grain_params() //TODO: impl.
+    return GST_AV1_PARSE_OK;
+  }
+
+  fg_params->grain_seed = gst_av1_read_bits(br);
+
+  if ( frame_header->frame_type == GST_AV1_INTER_FRAME )
+    fg_params->update_grain = gst_av1_read_bit(br);
+  else
+    fg_params->update_grain = 1;
+
+  if ( !fg_params->update_grain ) {
+    fg_params->film_grain_params_ref_idx = gst_av1_read_bits(br,3);
+
+    // TODO- look at the following:
+    /*tempGrainSeed = grain_seed
+    load_grain_params( film_grain_params_ref_idx )
+    grain_seed = tempGrainSeed
+    return*/
+    // END TODO
+  }
+
+  fg_params->num_y_points = gst_av1_read_bits(br,4);
+
+  for(int i = 0; i < fg_params->num_y_points; i++) {
+    fg_params->point_y_value[i] = gst_av1_read_bits(br,8);
+    fg_params->point_y_scaling[i] = gst_av1_read_bits(br,8);
+  }
+
+  if(seq_header->color_config.mono_chrome) {
+    fg_params->chroma_scaling_from_luma = 0;
+  } else {
+    fg_params->chroma_scaling_from_luma = gst_av1_read_bit(br);
+  }
+
+  if ( seq_header->color_config.mono_chrome || fg_params->chroma_scaling_from_luma ||
+     ( seq_header->color_config.subsampling_x == 1 && seq_header->color_config.subsampling_y == 1 &&
+     fg_params->num_y_points == 0 ) ) {
+    fg_params->num_cb_points = 0;
+    fg_params->num_cr_points = 0;
+  } else {
+    fg_params->num_cb_points = gst_av1_read_bits(br,4);
+  for ( int i = 0; i < num_cb_points; i++ ) {
+    fg_params->point_cb_value[i] = gst_av1_read_bits(br,8);
+    fg_params->point_cb_scaling[i] = gst_av1_read_bits(br,8);
+  }
+  fg_params->num_cr_points = gst_av1_read_bits(br,4);
+  for ( i = 0; i < num_cr_points; i++ ) {
+    fg_params->point_cr_value[ i ]= gst_av1_read_bits(br,8);
+    fg_params->point_cr_scaling[ i ]= gst_av1_read_bits(br,8);
+  }
+
+  fg_params->grain_scaling_minus_8 = gst_av1_read_bits(br,2);
+  fg_params->ar_coeff_lag = gst_av1_read_bits(br,2);
+  int numPosLuma = 2 * fg_params->ar_coeff_lag * ( fg_params->ar_coeff_lag + 1 );
+  if ( fg_params->num_y_points ) {
+    int numPosChroma = numPosLuma + 1;
+    for ( int i = 0; i < numPosLuma; i++ )
+      fg_params->ar_coeffs_y_plus_128[ i ] = gst_av1_read_bits(br,8);
+  } else {
+    int numPosChroma = numPosLuma;
+  }
+
+  if ( fg_params->chroma_scaling_from_luma || fg_params->num_cb_points ) {
+    for ( i = 0; i < numPosChroma; i++ )
+      fg_params->ar_coeffs_cb_plus_128[i] = gst_av1_read_bits(br,8);
+  }
+
+  if ( fg_params->chroma_scaling_from_luma || fg_params->num_cr_points ) {
+    for ( int i = 0; i < numPosChroma; i++ )
+      fg_params->ar_coeffs_cr_plus_128[i] = gst_av1_read_bits(br,8);
+  }
+
+
+  fg_params->ar_coeff_shift_minus_6 = gst_av1_read_bits(br,2);
+  fg_params->grain_scale_shift = gst_av1_read_bits(br,2);
+
+  if ( fg_params->num_cb_points ) {
+    fg_params->cb_mult= gst_av1_read_bits(br,8);
+    fg_params->cb_luma_mult= gst_av1_read_bits(br,8);
+    fg_params->cb_offset= gst_av1_read_bits(br,9);
+  }
+
+  if ( fg_params->num_cr_points ) {
+    fg_params->cr_mult= gst_av1_read_bits(br,8);
+    fg_params->cr_luma_mult= gst_av1_read_bits(br,8);
+    fg_params->cr_offset= gst_av1_read_bits(br,9);
+  }
+
+  fg_params->overlap_flag = gst_av1_read_bit(br);
+  fg_params->clip_to_restricted_range = gst_av1_read_bit(br);
+
+  return GST_AV1_PARSE_OK;
+}
 
 GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
