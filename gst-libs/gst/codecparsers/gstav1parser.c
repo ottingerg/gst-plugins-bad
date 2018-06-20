@@ -754,39 +754,108 @@ int gst_av1_helper_tile_log2( int blkSize, int target ) {
 GstAV1ParserResult gst_av1_parse_tile_info (GstBitReader *br, GstAV1TileInfo *tile_info, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
 
-  //TODO: Which values should be moved into GstAV1TileInfo? -> decide accordingly to spec 6.8.14
   int sbCols = seq_header->use_128x128_superblock ? ( ( frame_header->MiCols + 31 ) >> 5 ) : ( ( frame_header->MiCols + 15 ) >> 4 );
   int sbRows = seq_header->use_128x128_superblock ? ( ( frame_header->MiRows + 31 ) >> 5 ) : ( ( frame_header->MiRows + 15 ) >> 4 );
   int sbShift = seq_header->use_128x128_superblock ? 5 : 4;
   int sbSize = sbShift + 2;
   int maxTileWidthSb = GST_AV1_MAX_TILE_WIDTH >> sbSize;
   int maxTileAreaSb = GST_AV1_MAX_TILE_AREA >> ( 2 * sbSize );
-  int minLog2TileCols = gst_av1_tile_log2(maxTileWidthSb, sbCols);
-  int maxLog2TileCols = gst_av1_tile_log2(1, Min(sbCols, MAX_TILE_COLS));
-  int maxLog2TileRows = gst_av1_tile_log2(1, Min(sbRows, MAX_TILE_ROWS));
-  int minLog2Tiles = Max(minLog2TileCols,gst_av1_tile_log2(maxTileAreaSb, sbRows * sbCols));
+  int minLog2TileCols = gst_av1_helper_tile_log2(maxTileWidthSb, sbCols);
+  int maxLog2TileCols = gst_av1_helper_tile_log2(1, Min(sbCols, MAX_TILE_COLS));
+  int maxLog2TileRows = gst_av1_helper_tile_log2(1, Min(sbRows, MAX_TILE_ROWS));
+  int minLog2Tiles = Max(minLog2TileCols,gst_av1_helper_tile_log2(maxTileAreaSb, sbRows * sbCols));
   int increment_tile_cols_log2;
+  int increment_tile_rows_log2;
+  int width_in_sbs_minus_1;
+  int tileWidthSb;
+  int height_in_sbs_minus_1;
+  int tileHeightSb;
+  int i;
+  int maxWidth, maxHeight;
+  int tile_size_bytes_minus_1;
 
   tile_info->uniform_tile_spacing_flag = gst_av1_read_bit(br);
   if ( tile_info->uniform_tile_spacing_flag ) {
     tile_info->TileColsLog2 = minLog2TileCols;
-     while ( tile_info->TileColsLog2 < maxLog2TileCols ) {
-     increment_tile_cols_log2 = gst_av1_read_bit(br);
-     if ( increment_tile_cols_log2 == 1 )
-       tile_info->TileColsLog2++;
-     else
-       break;
-  }
-  int tileWidthSb = (sbCols + (1 << TileColsLog2) - 1) >> TileColsLog2
-  i = 0
-  for ( startSb = 0; startSb < sbCols; startSb += tileWidthSb ) {
-  MiColStarts[ i ] = startSb << sbShift
-  i += 1
-  }
-  MiColStarts[i] = MiCols
-  TileCols = i
+    while ( tile_info->TileColsLog2 < maxLog2TileCols ) {
+      increment_tile_cols_log2 = gst_av1_read_bit(br);
+      if ( increment_tile_cols_log2 == 1 )
+        tile_info->TileColsLog2++;
+      else
+        break;
+    }
+    tileWidthSb = (sbCols + (1 << tile_info->TileColsLog2) - 1) >> tile_info->TileColsLog2;
+    i = 0;
+    for ( startSb = 0; startSb < sbCols; startSb += tileWidthSb ) {
+      tile_info->MiColStarts[ i ] = startSb << sbShift;
+      i += 1;
+    }
+    tile_info->MiColStarts[i] = frame_header->MiCols;
+    tile_info->TileCols = i;
+
+    minLog2TileRows = Max( minLog2Tiles - TileColsLog2, 0);
+    maxTileHeightSb = sbRows >> minLog2TileRows;
+    tile_info->TileRowsLog2 = minLog2TileRows
+    while ( tile_info->TileRowsLog2 < maxLog2TileRows ) {
+      increment_tile_rows_log2 = gst_av1_read_bit(br);
+      if ( increment_tile_rows_log2 == 1 )
+        tile_info->TileRowsLog2++;
+      else
+        break;
+    }
+    tileHeightSb = (sbRows + (1 << tile_info->TileRowsLog2) - 1) >> tile_info->TileRowsLog2;
+    i = 0;
+    for ( startSb = 0; startSb < sbRows; startSb += tileHeightSb ) {
+      tile_info->MiRowStarts[ i ] = startSb << sbShift;
+      i += 1;
+    }
+    tile_info->MiRowStarts[i] = frame_header->MiRows;
+    tile_info->TileRows = i;
+  } else {
+    widestTileSb = 0
+    startSb = 0
+    for ( i = 0; startSb < sbCols; i++ ) {
+      tile_info->MiColStarts[ i ] = startSb << sbShift;
+      maxWidth = Min(sbCols - startSb, maxTileWidthSb);
+      gst_av1_bitstreamfn_ns(br,maxWidth,&width_in_sbs_minus_1);
+      sizeSb = width_in_sbs_minus_1 + 1;
+      widestTileSb = Max( sizeSb, widestTileSb );
+      startSb += sizeSb;
+    }
+    tile_info->MiColStarts[i] = frame_header->MiCols;
+    tile_info->TileCols = i;
+    TileColsLog2 = gst_av1_helper_tile_log2(1, TileCols);
+
+    if ( minLog2Tiles > 0)
+      maxTileAreaSb = (sbRows * sbCols) >> (minLog2Tiles + 1);
+    else
+      maxTileAreaSb= sbRows * sbCols;
+
+    maxTileHeightSb = Max( maxTileAreaSb / widestTileSb, 1 );
 
 
+    startSb = 0;
+    for ( i = 0; startSb < sbRows; i++ ) {
+      MiRowStarts[ i ] = startSb << sbShift;
+      maxHeight = Min(sbRows - startSb, maxTileHeightSb);
+      gst_av1_bitstreamfn_ns(br,maxWidth,&height_in_sbs_minus_1);
+      sizeSb = height_in_sbs_minus_1 + 1;
+      startSb += sizeSb;
+    }
+
+    tile_info->MiRowStarts[ i ] = frame_header->MiRows;
+    tile_info->TileRows = i;
+    tile_info->TileRowsLog2 = gst_av1_helper_tile_log2(1, tile_info->TileRows);
+  }
+  if ( tile_info->TileColsLog2 > 0 || tile_info->TileRowsLog2 > 0 ) {
+    tile_info->context_update_tile_id = gst_av1_read_bits(br,tile_info->TileColsLog2+tile_info->TileRowsLog2);
+    tile_size_bytes_minus_1 = gst_av1_read_bit(br);
+    tile_info->TileSizeBytes = tile_size_bytes_minus_1 + 1;
+  } else {
+    tile_info->context_update_tile_id = 0;
+  }
+
+  return GST_AV1_PARSE_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_loop_filter_params (GstBitReader *br, GstAV1LoopFilterParams *lf_params, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
@@ -833,6 +902,20 @@ GstAV1ParserResult gst_av1_parse_loop_filter_params (GstBitReader *br, GstAV1Loo
           gst_av1_bitstreamfn_su(br,7,&(lf_params->loop_filter_mode_deltas[i]);
       }
     }
+  }
+
+  return GST_AV1_PARSE_OK;
+}
+
+GstAV1ParserResult gst_av1_parse_quantizer_index_delta_params (GstBitReader *br, GstAV1QuantizationParams *quant_params)
+{
+  quant_params->delta_q_res = 0;
+  quant_params->delta_q_present = 0;
+  if ( quant_params->base_q_idx > 0 ) {
+    quant_params->delta_q_present = gst_av1_read_bit(br);
+  }
+  if ( quant_params->delta_q_present ) {
+    quant_params->delta_q_res = gst_av1_read_bits(br,2);
   }
 
   return GST_AV1_PARSE_OK;
@@ -959,7 +1042,7 @@ GstAV1ParserResult gst_av1_parse_tx_mode (GstBitReader *br, GstAV1FrameHeaderOBU
   return GST_AV1_PARSE_OK;
 }
 
-GstAV1ParserResult gst_av1_parse_loop_restoration_params (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header)
+GstAV1ParserResult gst_av1_parse_skip_mode_params (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header)
 {
   int skipModeAllowed = 0;
 
@@ -1261,6 +1344,7 @@ GstAV1ParserResult gst_av1_parse_film_grain_params (GstBitReader *br, GstAV1Film
 GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
   int idLen = 0;
+  GstAV1ParserResult ret;
 
   if(seq_header->frame_id_number_present_flag)
     idLen = seq_header->additional_frame_id_length_minus_1 + seq_header->delta_frame_id_length_minus_2 + 3;
@@ -1477,8 +1561,108 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, Gs
     frame_header->disable_frame_end_update_cdf = gst_av1_read_bit(br);
 
   //SPECs sets upt CDFs here - for codecparser we are ommitting this section.
+  /* SKIP
+  if ( primary_ref_frame == PRIMARY_REF_NONE ) {
+    init_non_coeff_cdfs( )
+    setup_past_independence( )
+  } else {
+    if ( use_ref_frame_mvs == 1 )
+       motion_field_estimation( )
+*/
+  ret=gst_av1_parse_tile_info ( *br, GstAV1TileInfo &(frame_header->tile_info),frame_header,seq_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
 
-  tile_info() //TODO: to be VA_STATUS_ERROR_UNIMPLEMENTED
+  ret=gst_av1_parse_quantization_params (br, &(frame_header->quantization_params),&(seq_header->color_config));
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  ret=gst_av1_parse_segmentation_params (br, &(frame_header->segmentation_params), frame_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  ret=gst_av1_parse_quantizer_index_delta_params (br, &(frame_header->quantization_params));
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  ret=gst_av1_parse_loop_filter_delta_params(br,&(frame_header->loop_filter_params),frame_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+/*
+  if ( primary_ref_frame == PRIMARY_REF_NONE ) {
+    init_coeff_cdfs( )
+  } else {
+    load_previous_segment_ids( )
+  }
+*/
+  frame_header->CodedLossless = 1;
+  for ( int segmentId = 0; segmentId < GST_AV1_MAX_SEGMENTS; segmentId++ )
+    int qindex = get_qindex( 1, segmentId );
+    frame_header->LosslessArray[ segmentId ] = qindex == 0 && frame_header->quantization_params.DeltaQYDc ==
+                                               frame_header->quantization_params.DeltaQUAc == 0 && frame_header->quantization_params.DeltaQUDc &&
+                                               frame_header->quantization_params.DeltaQVAc == 0 && frame_header->quantization_params.DeltaQVDc;
+    if ( !frame_header->LosslessArray[ segmentId ] )
+      frame_header->CodedLossless = 0
+    if (  frame_header->quantization_params.using_qmatrix ) {
+      if ( frame_header->LosslessArray[ segmentId ] ) {
+        frame_header->SegQMLevel[ 0 ][ segmentId ] = 15;
+        frame_header->SegQMLevel[ 1 ][ segmentId ] = 15;
+        frame_header->SegQMLevel[ 2 ][ segmentId ] = 15;
+      } else {
+        frame_header->SegQMLevel[ 0 ][ segmentId ] = frame_header->quantization_params.qm_y;
+        frame_header->SegQMLevel[ 1 ][ segmentId ] = frame_header->quantization_params.qm_u;
+        frame_header->SegQMLevel[ 2 ][ segmentId ] = frame_header->quantization_params.qm_v;
+      }
+    }
+  }
+  frame_header->AllLossless = frame_header->CodedLossless && ( frame_header->FrameWidth == frame_header->UpscaledWidth);
+
+  ret = gst_av1_parse_loop_filter_params (br,&(frame_header->loop_filter_params),frame_header,seq_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  ret = gst_av1_parse_cdef_params (br, &(frame_header->cdef_params),frame_header,seq_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  ret = gst_av1_parse_loop_restoration_params (br, &(frame_header->loop_restoration_params), frame_header,seq_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  ret = gst_av1_parse_tx_mode (br,frame_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  //inlined frame_reference_mode()
+  if ( frame_header->FrameIsIntra ) {
+    frame_header->reference_select = 0
+  } else {
+    frame_header->reference_select = gst_av1_read_bit(br);
+  }
+
+  ret = gst_av1_parse_skip_mode_params (br, frame_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  if ( frame_header_>FrameIsIntra ||
+       frame_header->error_resilient_mode ||
+       !seq_header->enable_warped_motion )
+    frame_header->allow_warped_motion = 0;
+  else
+    frame_header->allow_warped_motion;
+
+  frame_header->reduced_tx_set = gst_av1_read_bit(br);
+
+  ret=gst_av1_parse_global_motion_params (br, &(frame_header->global_motion_params), frame_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  ret = gst_av1_parse_film_grain_params (br, &(frame_header->film_grain_params),frame_header,seq_header);
+  if (ret != GST_AV1_PARSE_OK)
+    return ret;
+
+  return GST_AV1_PARSE_OK;
 
 }
 
@@ -1498,3 +1682,6 @@ GstAV1ParserResult gst_av1_parse_tile_list_obu( GstBitReader *br, GstAV1TileList
 
   return GST_AV1_PARSE_OK;
 }
+
+
+//TODO: Tile Group OBU

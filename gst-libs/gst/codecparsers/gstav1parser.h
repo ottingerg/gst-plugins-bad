@@ -73,7 +73,7 @@ G_BEGIN_DECLS
 #define GST_AV1_GM_ABS_TRANS_BITS 12
 #define GST_AV1_GM_ABS_TRANS_ONLY_BITS 9
 #define GST_AV1_GM_ABS_ALPHA_BITS 12
-
+#define GST_AV1_MAX_TILES
 /**
  * GstAV1ParserResult:
  *
@@ -942,7 +942,7 @@ struct _GstAV1QuantizationParams {
  *                            their existing values.
  * @FeatureEnabled[]: equal to 0 indicates that the corresponding feature is unused and has value equal to 0.
  *                    FeatureEnabled[] equal to 1 indicates that the feature value is coded in the bitstream.
- * @FeatureValue[]: specifies the feature data for a segment feature.
+ * @FeatureData[]: specifies the feature data for a segment feature.
  * @SegIdPreSkip: equal to 1 indicates that the segment id will be read before the skip syntax element. SegIdPreSkip
  *                equal to 0 indicates that the skip syntax element will be read first.
  * @LastActiveSegId: indicates the highest numbered segment id that has some enabled feature. This is used when decoding
@@ -968,22 +968,55 @@ struct _GstAV1SegmenationParams {
  *                             tiles are the same size except for the ones at the right and bottom edge which can be smaller.)
  *                             uniform_tile_spacing_flag equal to 0 means that the tile sizes are coded.
  * @TileColsLog2: specifies the base 2 logarithm of the desired number of tiles across the frame.
+ * @TileCols: specifies the number of tiles across the frame. It is a requirement of bitstream conformance that TileCols is
+ *            less than or equal to MAX_TILE_COLS.
  * @TileRowsLog2: specifies the base 2 logarithm of the desired number of tiles down the frame.
- * @width_in_sbs_minus_1: specifies the width of a tile minus 1 in units of superblocks.
- * @height_in_sbs_minus_1: specifies the height of a tile minus 1 in units of superblocks.
- * @context_update_tile_id: specifies which tile to use for the CDF update.
+ * @TileRows: specifies the number of tiles down the frame. It is a requirement of bitstream conformance that TileRows is
+ *            less than or equal to MAX_TILE_ROWS.
+ */
+
+/*
+ * @width_in_sbs_minus_1[]: specifies the width of a tile minus 1 in units of superblocks.
+ * @tileWidthSb[]: is used to specify the width of each tile in units of superblocks. It is a requirement of bitstream conformance
+ *                 that tileWidthSb is less than maxTileWidthSb.
+ * @height_in_sbs_minus_1[]: specifies the height of a tile minus 1 in units of superblocks.
+ * @tileHeightSb[]: is used to specify the height of each tile in units of superblocks. It is a requirement of bitstream conformance
+ *                   that tileWidthSb * tileHeightSb is less than maxTileAreaSb.
  * @tile_size_bytes_minus_1: is used to compute TileSizeBytes
+ */
+
+/*
+ * @MiColStarts[]: is an array specifying the start column (in units of 4x4 luma samples) for each tile across the image.
+ *                 If uniform_tile_spacing_flag is equal to 0, it is a requirement of bitstream conformance that startSb is equal
+ *                 to sbCols when the loop writing MiColStarts exits.
+ * @MiRowStarts[]: is an array specifying the start row (in units of 4x4 luma samples) for each tile down the image.
+ *                 If uniform_tile_spacing_flag is equal to 0, it is a requirement of bitstream conformance that startSb is equal
+ *                 to sbRows when the loop writing MiRowStarts exits.
+ * @maxTileHeightSb: specifies the maximum height (in units of superblocks) that can be used for a tile (to avoid making tiles
+ *                   with too much area).
+ * @context_update_tile_id: specifies which tile to use for the CDF update.
+ * @TileSizeBytes specifies the number of bytes needed to code each tile size.
  *
  */
 
 struct _GstAV1TileInfo {
   guint8 uniform_tile_spacing_flag;
   guint8 TileColsLog2;
-  guint TileRowLog2;
-  guint32 width_in_sbs_minus_1[GST_AV1_MAX_TILE_COLS];
-  guint32 height_in_sbs_minus_1[GST_AV1_MAX_TILE_ROWS];
+  guint8 TileCols;
+  guint8 TileRowsLog2;
+  guint8 TileRows;
+  /*
+  guint32 width_in_sbs_minus_1[GST_AV1_MAX_TILE_COUNT;
+  guint32 tileWidthSb[GST_AV1_MAX_TILE_COUNT];
+  guint32 height_in_sbs_minus_1[GST_AV1_MAX_TILE_COUNT];
+  guint32 tileHeightSb[GST_AV1_MAX_TILE_COUNT];
+  */
+  guint32 MiColStarts[GST_AV1_MAX_TILE_COUNT];
+  guint32 MiRowStarts[GST_AV1_MAX_TILE_COUNT];
+  guint8 maxTileHeightSb;
   guint8 context_update_tile_id;
-  guint8 tile_size_bytes_minus_1;
+  //guint8 tile_size_bytes_minus_1;
+  guint8 TileSizeBytes;
 };
 
 /**
@@ -1292,6 +1325,8 @@ struct _GstAV1FilmGrainParams {
  * @AllLossless: is a variable that is equal to 1 when CodedLossless is equal to 1 and FrameWidth is equal to UpscaledWidth.
  *               This indicates that the frame is fully lossless at the upscaled resolution. In this case, the loop filter, CDEF filter, and
  *               loop restoration are disabled.
+ * @LossLessArray:
+ * @SegQMLevel:
  * @SkipModeFrame[]: specifies the frames to use for compound prediction when skip_mode is equal to 1.
  */
 
@@ -1358,6 +1393,7 @@ struct _GstAV1FrameHeaderOBU {
   guint8 skip_mode_present;
   guint8 reference_select;
   GstAV1GlobalMotionParams global_motion_params;
+  GstAV1FilmGrainParams film_grain_params;
   guint32 expectedFrameId[GST_AV1_REFS_PER_FRAME];
   guint32 RefUpscaledWidth[GST_AV1_REFS_PER_FRAME];
   guint32 RefFrameHeight[GST_AV1_REFS_PER_FRAME];
@@ -1368,6 +1404,8 @@ struct _GstAV1FrameHeaderOBU {
   guint32 RefFrameSignBias[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
   guint8 CodedLossless;
   guint8 AllLossless;
+  guint8 LossLessArray[GST_AV1_MAX_SEGMENTS];
+  guint8 SegQMLevel[3][GST_AV1_MAX_SEGMENTS];
   guint8 SkipModeFrame[2]; // is 2 appropiat?
 
 
