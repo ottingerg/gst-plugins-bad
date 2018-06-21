@@ -341,6 +341,17 @@ typedef enum {
 } GstAV1WarpModelType;
 
 /**
+ * GstAV1Parser:
+ *
+ */
+
+struct GstAV1Parser {
+  GstBitReader *br;
+  GstAV1ParserResult statuscode;
+  const char *last_func;
+};
+
+/**
  * _GstAV1OBUHeader:
  *
  * @obu_forbidden_bit: must be set to 0.

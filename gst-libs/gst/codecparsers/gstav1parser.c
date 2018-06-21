@@ -1,4 +1,4 @@
-/* gstvp9parser.c
+/* gstav1parser.c
  *
  *  Copyright (C) 2018 Georg Ottinger
  *    Author: Georg Ottinger<g.ottinger@gmx.at>
@@ -36,6 +36,11 @@
 #include <gst/base/gstbitreader.h>
 #include "gstav1parser.h"
 
+#define GST_AV1_STATUS_HELPER(pd) pd->last_func = __func__; pd->statuscode = GST_AV1_PARSE_OK
+#define GST_AV1_EVAL_RETVAL(ret) if (ret != GST_AV1_PARSE_OK) return ret
+#define GST_AV1_EVAL_STATUSCODE(pd) if (pd->statuscode != GST_AV1_PARSE_OK) return pd->statuscode
+#define GST_AV1_SET_STATUSCODE(pd,code) pd->statuscode = code
+
 #define gst_av1_read_bit(br) gst_bit_reader_get_bits_uint8_unchecked(br, 1)
 #define gst_av1_read_bits(br, bits) gst_bit_reader_get_bits_uint32_unchecked(br, bits)
 #define gst_av1_bit_reader_skip(br, bits) gst_bit_reader_skip(br,bits)
@@ -44,36 +49,39 @@
 #define gst_av1_bit_reader_get_pos(br) gst_bit_reader_get_pos(br)
 
 //TODO - guint64 Pointer is dangerous ?? (if other type is used?)
-GstAV1ParserResult gst_av1_bistreamfn_leb128(GstBitReader *br, guint64 *value)
+guint32 gst_av1_bistreamfn_leb128(GstAV1Parser *parser)
 {
-  char leb128_byte;
+  guint8 leb128_byte;
+  guint value = 0;
 
-  *value = 0;
+  GST_AV1_STATUS_HELPER(parser);
 
   for (int i = 0; i < 8; i++) {
       leb128_byte = gst_av1_read_bits(br,8);
-      *value |= ( ((int)leb128_byte & 0x7f) << (i*7) );
+      value |= ( ((int)leb128_byte & 0x7f) << (i*7) );
       if ( !(leb128_byte & 0x80) ) {
           break;
       }
   }
-  if (*value < ((1 << 32) - 1))) { //check for bitstream conformance see chapter4.10.5
-    return GST_AV1_PARSER_OK;
-  else
-    return GST_AV1_PARSER_ERROR;
+  if (value < ((1 << 32) - 1))) { //check for bitstream conformance see chapter4.10.5
+    return value;
+  } else {
+    GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_ERROR);
+    return 0;
+  }
 }
 
-//TODO - guint32 Pointer is dangerous ?? (if other type is used?)
-GstAV1ParserResult gst_av1_bistreamfn_uvlc(GstBitReader *br, guint32 *value)
+guint32 gst_av1_bistreamfn_uvlc(GstAV1Parser *parser)
 {
-  int leadingZero = 0;
-  int readv;
-  bool done;
-  int bitsread = 0;
+  guint8 leadingZero = 0;
+  guint32 readv;
+  guint32 value;
+  gboolean done;
+
+  GST_AV1_STATUS_HELPER(parser);
 
   while(1) {
     done = gst_av1_read_bit(br)
-    bitsread ++;
     if(done) {
       break;
     }
@@ -81,29 +89,27 @@ GstAV1ParserResult gst_av1_bistreamfn_uvlc(GstBitReader *br, guint32 *value)
   }
   if (leadingZero >= 32) {
     value = (1<<32) - 1;
-    return bitsread;
+    return value;
   }
   readv = gst_av1_read_bits(br,leadingZero);
-  bitsread += leadingZero;
   value = readv + ( 1 << leadingZero) - 1;
 
-  return GST_AV1_PARSER_OK;
+  return value;
 }
 
-//TODO - gint8 Pointer is dangerous ?? (if other type is used?)
 
-GstAV1ParserResult gst_av1_bistreamfn_su(GstBitReader *br, guint8 n , gint8 *value)
+guint32 gst_av1_bistreamfn_su(GstAV1Parser *parser, guint8 n)
 {
-    int v,signMask;
+    guint32 v,signMask;
+
+    GST_AV1_STATUS_HELPER(parser);
 
     v = gst_av1_read_bits(br,n);
     signMask = 1 << (n-1);
     if( v & signMask)
-     *value = v - 2*signMask;
+      return v - 2*signMask;
     else
-     *value = v;
-
-     return GST_AV1_PARSER_OK;
+      return v;
 }
 
 
@@ -161,10 +167,12 @@ GstAV1ParserResult gst_av1_parse_obu_header( GstBitReader *br, GstAV1OBUHeader *
     obu_header->extension_header_reserved_3bits = gst_av1_read_bits(br, 3);
   }
 
-  if(obu_header->obu_has_size_field)
-    return gst_av1_bistreamfn_leb128(br,&(obu_header->obus_size));
-  else
+  if(obu_header->obu_has_size_field) {
+    obu_header->obus_size=gst_av1_bistreamfn_leb128(parser);
+    GST_AV1_EVAL_STATUSCODE(parser);
+  } else {
     return GST_AV1_PARSER_OK;
+  }
 }
 
 GstAV1ParserResult gst_av1_parse_color_config( GstBitReader *br, GstAV1ColorConfig *color_config, guint8 seq_profile )
@@ -245,8 +253,10 @@ GstAV1ParserResult gst_av1_parse_timing_info( GstBitReader *br, GstAV1TimingInfo
   timing_info->num_units_in_display_tick = gst_av1_read_bits(br,32);
   timing_info->time_scale = gst_av1_read_bits(br,32);
   timing_info->equal_picture_interval = gst_av1_read_bit(br);
-  if( timing_info->equal_picture_interval )
-    gst_av1_bistreamfn_uvlc(br,&(timing_info->num_ticks_per_picture_minus_1));
+  if( timing_info->equal_picture_interval ) {
+    timing_info->num_ticks_per_picture_minus_1=gst_av1_bistreamfn_uvlc(parser);
+    GST_AV1_EVAL_STATUSCODE(parser);
+  }
 
   return GST_AV1_PARSE_OK;
 }
@@ -270,8 +280,10 @@ GstAV1ParserResult gst_av1_parse_operating_parameters_info(GstBitReader *br,GstA
 {
   //bzero(op_point, sizeof(GstAV1OperatingPoint));
 
-  gst_av1_bistreamfn_uvlc(br, &(op_point->bitrate_minus_1));
-  gst_av1_bistreamfn_uvlc(br, &(op_point->buffer_size_minus_1));
+  op_point->bitrate_minus_1=gst_av1_bistreamfn_uvlc(parser);
+  GST_AV1_EVAL_STATUSCODE(parser);
+  op_point->buffer_size_minus_1=gst_av1_bistreamfn_uvlc(parser);
+  GST_AV1_EVAL_STATUSCODE(parser);
   op_point->cbr_flag = gst_av1_read_bit(br);
   op_point->decoder_buffer_delay = gst_av1_read_bits(br,buffer_delay_length_minus_1+1)
   op_point->encoder_buffer_delay = gst_av1_read_bits(br,buffer_delay_length_minus_1+1)
@@ -305,13 +317,12 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstBitReader *br, GstAV1Se
 
     if ( seq_header->timing_info_present_flag ) {
       ret = gst_av1_parse_timing_info(br,&(seq_header->timing_info));
-      if (ret != GST_AV1_PARSE_OK)
-        return ret;
+      GST_AV1_EVAL_RETVAL(ret);
+
       seq_header->decoder_model_info_present_flag = gst_av1_read_bit(br);
       if ( seq_header->decoder_model_info_present_flag )
         ret = gst_av1_parse_decoder_model_info(br,&(seq_header->decoder_model_info));
-        if (ret != GST_AV1_PARSE_OK)
-          return ret;
+        GST_AV1_EVAL_RETVAL(ret);
       } else {
       seq_header->decoder_model_info_present_flag = 0;
     }
@@ -331,8 +342,7 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstBitReader *br, GstAV1Se
          seq_header->operating_points[i].decoder_model_present_for_this_op = gst_av1_read_bit(br);
          if ( seq_header->operating_points[i].decoder_model_present_for_this_op )
            ret=gst_av1_parse_operating_parameters_info( br,&(seq_header->operating_points[i]), seq_header->decoder_model_info.buffer_removal_delay_length_minus_1 );
-           if (ret != GST_AV1_PARSE_OK)
-             return ret;
+           GST_AV1_EVAL_RETVAL(ret);
       } else {
         seq_header->operating_points[i].decoder_model_present_for_this_op = 0
       }
@@ -417,8 +427,7 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstBitReader *br, GstAV1Se
   seq_header->seq_enable_restoration = gst_av1_read_bit(br);
 
   ret=gst_av1_parse_color_config(br,seq_header, &(seq_header->color_config));
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
 
   seq_header->film_grain_params_present = gst_av1_read_bit(br);
 
@@ -558,10 +567,10 @@ GstAV1ParserResult gst_av1_parse_metadata_obu(GstBitReader *br, GstAV1MetadataOB
   GstAV1ParserResult ret;
 
   bzero(metadata,sizeof(GstAV1MetadataOBU));
-  ret = gst_av1_bistreamfn_leb128(br,&(metadata->metadata_type));
 
-  if(ret == GST_AV1_PARSE_ERROR)
-    return GST_AV1_PARSE_ERROR;
+  metadata->metadata_type=gst_av1_bitstreamfn_leb128(parser);
+  GST_AV1_EVAL_STATUSCODE(parser);
+
 
   switch(metadata->metadata_type)
   {
@@ -631,17 +640,16 @@ GstAV1ParserResult gst_av1_parse_frame_size_with_refs (GstBitReader *br, GstAV1F
   }
   if ( frame_header->found_ref == 0 ) {
     ret=gst_av1_parse_frame_size(br,frame_header,seq_header);
-    if (ret != GST_AV1_PARSE_OK)
-      return ret;
+    GST_AV1_EVAL_RETVAL(ret);
 
     ret=gst_av1_parse_render_size(br,frame_header);
-    if (ret != GST_AV1_PARSE_OK)
-      return ret;
+    GST_AV1_EVAL_RETVAL(ret);
+
 
   } else {
     ret=gst_av1_parse_superres_params_compute_image_size(br,frame_header,seq_header);
-    if (ret != GST_AV1_PARSE_OK)
-      return ret;
+    GST_AV1_EVAL_RETVAL(ret);
+
   }
 }
 
@@ -661,8 +669,8 @@ GstAV1ParserResult gst_av1_parse_frame_size (GstBitReader *br, GstAV1FrameHeader
   }
 
   ret=gst_av1_parse_superres_params_compute_image_size(br,frame_header,seq_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   retrun GST_AV1_PARSE_OK;
 }
@@ -686,10 +694,12 @@ GstAV1ParserResult gst_av1_parse_render_size (GstBitReader *br, GstAV1FrameHeade
 GstAV1ParserResult gst_av1_parse_delta_q (GstBitReader *br, gint8 *delta_q)
 {
   guint8 delta_coded = gst_av1_read_bit(br);
-  if(delta_codec)
-    gst_av1_bitstreamfn_su(br,7,delta_q)
-  else
+  if(delta_codec) {
+    delta_q = gst_av1_bitstreamfn_su(parser);
+    GST_AV1_EVAL_STATUSCODE(parser);
+  } else {
     delta_q = 0;
+  }
 
   return GST_AV1_PARSE_OK;
 }
@@ -772,7 +782,8 @@ GstAV1ParserResult gst_av1_parse_segmentation_params (GstBitReader *br, GstAV1Se
             int bitsToRead = Segmentation_Feature_Bits[j];
             int limit = Segmentation_Feature_Max[j];
             if( Segmentation_Feature_Signed [j] ) {
-              gst_av1_bitstreamfn_su(br,1+bitsToRead,&feature_value);
+              feature_value = gst_av1_bitstreamfn_su(parser);
+              GST_AV1_EVAL_STATUSCODE(parser);
               clipped_value = gst_av1_clip3(limit * (-1), limit, feature_value);
             } else {
               feature_value = gst_av1_read_bits(br,bitsToRead);
@@ -957,13 +968,17 @@ GstAV1ParserResult gst_av1_parse_loop_filter_params (GstBitReader *br, GstAV1Loo
     if ( lf_params->loop_filter_delta_update) {
       for ( int i = 0; i < GST_AV1_TOTAL_REFS_PER_FRAME; i++ ) {
         lf_params->update_ref_delta = gst_av1_read_bit(br);
-        if ( lf_params->update_ref_delta)
-          gst_av1_bitstreamfn_su(br,7,&(lf_params->loop_filter_ref_deltas[i]);
+        if ( lf_params->update_ref_delta) {
+          lf_params->loop_filter_ref_deltas[i]= gst_av1_bitstreamfn_su(parser);
+          GST_AV1_EVAL_STATUSCODE(parser);
+        }
       }
       for ( int i = 0; i < 2; i++ ) {
         lf_params->update_mode_delta = gst_av1_read_bit(br);
-        if ( lf_params->update_mode_delta )
-          gst_av1_bitstreamfn_su(br,7,&(lf_params->loop_filter_mode_deltas[i]);
+        if ( lf_params->update_mode_delta ) {
+          lf_params->loop_filter_mode_deltas[i]= gst_av1_bitstreamfn_su(parser);
+          GST_AV1_EVAL_STATUSCODE(parser);
+        }
       }
     }
   }
@@ -1636,24 +1651,23 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, Gs
        motion_field_estimation( )
 */
   ret=gst_av1_parse_tile_info ( *br, GstAV1TileInfo &(frame_header->tile_info),frame_header,seq_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
 
   ret=gst_av1_parse_quantization_params (br, &(frame_header->quantization_params),&(seq_header->color_config));
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   ret=gst_av1_parse_segmentation_params (br, &(frame_header->segmentation_params), frame_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   ret=gst_av1_parse_quantizer_index_delta_params (br, &(frame_header->quantization_params));
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   ret=gst_av1_parse_loop_filter_delta_params(br,&(frame_header->loop_filter_params),frame_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
 /*
   if ( primary_ref_frame == PRIMARY_REF_NONE ) {
@@ -1685,20 +1699,20 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, Gs
   frame_header->AllLossless = frame_header->CodedLossless && ( frame_header->FrameWidth == frame_header->UpscaledWidth);
 
   ret = gst_av1_parse_loop_filter_params (br,&(frame_header->loop_filter_params),frame_header,seq_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   ret = gst_av1_parse_cdef_params (br, &(frame_header->cdef_params),frame_header,seq_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   ret = gst_av1_parse_loop_restoration_params (br, &(frame_header->loop_restoration_params), frame_header,seq_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   ret = gst_av1_parse_tx_mode (br,frame_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   //inlined frame_reference_mode()
   if ( frame_header->FrameIsIntra ) {
@@ -1708,8 +1722,8 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, Gs
   }
 
   ret = gst_av1_parse_skip_mode_params (br, frame_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   if ( frame_header_>FrameIsIntra ||
        frame_header->error_resilient_mode ||
@@ -1721,12 +1735,12 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstBitReader *br, Gs
   frame_header->reduced_tx_set = gst_av1_read_bit(br);
 
   ret=gst_av1_parse_global_motion_params (br, &(frame_header->global_motion_params), frame_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   ret = gst_av1_parse_film_grain_params (br, &(frame_header->film_grain_params),frame_header,seq_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
 
   return GST_AV1_PARSE_OK;
@@ -1824,8 +1838,8 @@ GstAV1ParserResult gst_av1_parse_frame_header_obu( GstBitReader *br,  GstAV1Fram
     return GST_AV1_PARSE_OK;
   } else {
     ret = gst_av1_parse_uncompressed_frame_header(br,frame_header,seq_header)
-    if (ret != GST_AV1_PARSE_OK)
-      return ret;
+    GST_AV1_EVAL_RETVAL(ret);
+
     frame_header->SeenFrameHeader = 1;
 
     if(frame_header->show_existing_frame) {
@@ -1846,16 +1860,16 @@ GstAV1ParserResult gst_av1_parse_frame_obu( GstBitReader *br, GstAV1Size sz, Gst
 
   int startBitPos = gst_av1_bit_reader_get_pos(br);
   ret = gst_av1_parse_frame_header_obu(br, frame_header, seq_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   gst_av1_bit_reader_skip_to_byte(br);
   int endBitPos = gst_av1_bit_reader_get_pos(br);
   int headerBytes = (endBitPos - startBitPos) / 8;
   int sz -= headerBytes;
   ret = gst_av1_parse_tile_group_obu(br, sz, tile_group, frame_header);
-  if (ret != GST_AV1_PARSE_OK)
-    return ret;
+  GST_AV1_EVAL_RETVAL(ret);
+
 
   return GST_AV1_PARSE_OK;
 }
