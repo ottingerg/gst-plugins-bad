@@ -1192,6 +1192,8 @@ struct _GstAV1FilmGrainParams {
 /**
  * _GstAV1FrameHeaderOBU:
  *
+ * @SeenFrameHeader: is a variable used to mark whether the frame header for the current frame has been received.
+ *                   It is initialized to zero.
  * @show_existing_frame: equal to 1, indicates the frame indexed by frame_to_show_map_idx is to be output;
  *                       show_existing_frame equal to 0 indicates that further processing is required.
  *                       If obu_type is equal to OBU_FRAME, it is a requirement of bitstream conformance
@@ -1331,6 +1333,7 @@ struct _GstAV1FilmGrainParams {
  */
 
 struct _GstAV1FrameHeaderOBU {
+  guint8 SeenFrameHeader;
   guint8 show_existing_frame;
   guint8 frame_to_show_map_idx;
   guint32 frame_presentation_time;
