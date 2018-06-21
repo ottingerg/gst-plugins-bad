@@ -39,8 +39,9 @@
 #define gst_av1_read_bit(br) gst_bit_reader_get_bits_uint8_unchecked(br, 1)
 #define gst_av1_read_bits(br, bits) gst_bit_reader_get_bits_uint32_unchecked(br, bits)
 #define gst_av1_bit_reader_skip(br, bits) gst_bit_reader_skip(br,bits)
-#define gst_bit_reader_skip_to_byte(br) gst_av1_bit_reader_skip_to_byte(br)
-
+#define gst_av1_bit_reader_skip_bytes(br,bytes) gst_bit_reader_skip(br,(bytes)*8)
+#define gst_av1_bit_reader_skip_to_byte(br) gst_bit_reader_skip_to_byte(br)
+#define gst_av1_bit_reader_get_pos(br) gst_bit_reader_get_pos(br)
 
 //TODO - guint64 Pointer is dangerous ?? (if other type is used?)
 GstAV1ParserResult gst_av1_bistreamfn_leb128(GstBitReader *br, guint64 *value)
@@ -128,6 +129,16 @@ GstAV1ParserResult gst_av1_bitstreamfn_ns(GstBitReader *br, guint8 n , gint8 *va
     return v;
   int extra_bit = gst_av1_read_bit(br);
   return (v << 1) - m + extra_bit;
+}
+
+guint gst_av1_bitstreamfn_le(GstBitReader *br, guint8 n)
+{
+  guint t = 0
+  for ( int i = 0; i < n; i++) {
+    byte = gst_av1_read_bits(br,8);
+    t += ( byte << ( i * 8 ) );
+  }
+  return t;
 }
 
 GstAV1ParserResult gst_av1_parse_obu_header( GstBitReader *br, GstAV1OBUHeader *obu_header)
@@ -1677,11 +1688,69 @@ GstAV1ParserResult gst_av1_parse_tile_list_obu( GstBitReader *br, GstAV1TileList
     tile_list->entry[tile].anchor_tile_col = gst_av1_read_bits(br,8);
     tile_list->entry[tile].tile_data_size_minus_1 = gst_av1_read_bits(br,16);
     //skip ofer coded_tile_data
-    gst_av1_bit_reader_skip(br,8*(tile_list->entry[tile].tile_data_size_minus_1+1)));
+    gst_av1_bit_reader_skip_bytes(br,tile_list->entry[tile].tile_data_size_minus_1+1));
   }
 
   return GST_AV1_PARSE_OK;
 }
 
 
-//TODO: Tile Group OBU
+GstAV1ParserResult gst_av1_parse_tile_group_obu( GstBitReader *br, GstAV1Size sz, GstAV1TileGroupOBU *tile_group, GstAV1FrameHeaderOBU *frame_header) {
+  tile_group->NumTiles = frame_header->tile_info.TileCols * frame_header->tile_info.TileRows;
+  int startBitPos = gst_av1_bit_reader_get_pos(br);
+  tile_group->tile_start_and_end_present_flag=0;
+
+  if ( tile_group->NumTiles > 1 )
+    tile_group->tile_start_and_end_present_flag = gst_av1_read_bit(br);
+  if ( tile_group->NumTiles == 1 || !tile_group->tile_start_and_end_present_flag ) {
+    tile_group->tg_start = 0;
+    tg_end = NumTiles - 1;
+  } else {
+    int tileBits = frame_header->tile_info.TileColsLog2 + frame_header->tile_info.TileRowsLog2;
+    tg_start = gst_av1_read_bits(br,tileBits);
+    tg_end = gst_av1_read_bits(br,tileBits);
+  }
+
+  gst_av1_bit_reader_skip_to_byte(br);
+  int endBitPos = gst_av1_bit_reader_get_pos(br);
+  int headerBytes = (endBitPos - startBitPos) / 8;
+  sz -= headerBytes;
+
+  for ( int TileNum = tg_start; TileNum <= tg_end; TileNum++ ) {
+    tile_group->entry[TileNum].tileRow = TileNum / frame_header->tile_info.TileCols;
+    tile_group->entry[TileNum].tileCol = TileNum % frame_header->tile_info.TileCols;
+    //if last tile
+    if (TileNum == tg_end) {
+      tile_group->entry[TileNum].tileSize = sz;
+    } else {
+      int tile_size_minus_1 = gst_av1_bitstreamfn_le(br,frame_header->tile_info.TileSizeBytes);
+      tile_group->entry[TileNum].tileSize = tile_size_minus_1 + 1;
+      sz -= tile_group->entry[TileNum].tileSize - frame_header->tile_info.TileSizeBytes;
+    }
+
+    tile_group->entry[TileNum].MiRowStart =  frame_header->tile_info.MiRowStarts[tile_group->entry[TileNum].tileRow];
+    tile_group->entry[TileNum].MiRowEnd =  frame_header->tile_info.MiRowStarts[tile_group->entry[TileNum].tileRow+1];
+    tile_group->entry[TileNum].MiColStart =  frame_header->tile_info.MiColStarts[tile_group->entry[TileNum].tileCol];
+    tile_group->entry[TileNum].MiColEnd =  frame_header->tile_info.MiColStarts[tile_group->entry[TileNum].tileCol+1];
+    tile_group->entry[TileNum].CurrentQIndex = frame_header->quantization_params.base_q_idx;
+    /* Skipped
+      init_symbol( tileSize )
+      decode_tile( )
+      exit_symbol( )
+    */
+    gst_av1_bit_reader_skip_bytes(br,tile_group->entry[TileNum].tileSize):
+  }
+
+  if ( tile_group->tg_end == tile_group->NumTiles - 1 ) {
+    /* Skipped
+    if ( !disable_frame_end_update_cdf ) {
+      frame_end_update_cdf( )
+    }
+    decode_frame_wrapup( )
+    */
+    //TODO: SeenFrameHeader
+    //SeenFrameHeader = 0
+  }
+
+  return GST_AV1_PARSE_OK;
+}

@@ -1446,7 +1446,51 @@ struct _GstAV1TileListOBU {
     guint16 tile_data_size_minus_1;
     //guint8 coded_tile_data[]; //skipped
   } entry[GST_AV1_MAX_TILE_COUNT];
-}
+};
+
+/**
+ * _GstAV1TileListOBU:
+ *
+ *
+ * @NumTiles: specifies the total number of tiles in the frame.
+ * @tile_start_and_end_present_flag: specifies whether tg_start and tg_end are present in the bitstream.
+ *                                   If tg_start and tg_end are not present in the bitstream, this tile group covers the
+ *                                   entire frame. If obu_type is equal to OBU_FRAME, it is a requirement of bitstream conformance
+ *                                   that the value of tile_start_and_end_present_flag is equal to 0.
+ * @tg_start: specifies the zero-based index of the first tile in the current tile group.
+ *            It is a requirement of bitstream conformance that the value of tg_start is equal to the value of TileNum at the point
+ *            that tile_group_obu is invoked.
+ * @tg_end: specifies the zero-based index of the last tile in the current tile group.
+ *          It is a requirement of bitstream conformance that the value of tg_end is greater than or equal to tg_start.
+ *          It is a requirement of bitstream conformance that the value of tg_end for the last tile group in each frame is equal to
+ *          NumTiles-1.
+ * @tileRow:
+ * @tileCol:
+ * @tileSize: specifies the size in bytes of the next coded tile.
+ * @MiRowStart:
+ * @MiRowEnd:
+ * @MiColStart:
+ * @MiColEnd:
+ * @CurrentQIndex:
+ *
+ */
+struct _GstAV1TileGroupOBU {
+  guint32 NumTiles;
+  guint8 tile_start_and_end_present_flag;
+  guint8 tg_start;
+  guint8 tg_end;
+  struct {
+    guint32 tileRow;
+    guint32 tileCol;
+    guint32 tileSize;
+    guint32 MiRowStart;
+    guint32 MiRowEnd;
+    guint32 MiColStart;
+    guint32 MiColEnd;
+    guint8 CurrentQIndex;
+  } entry[GST_AV1_MAX_TILE_COUNT];
+};
+
 
 GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
