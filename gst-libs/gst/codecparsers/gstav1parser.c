@@ -420,7 +420,7 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstAV1Parser *parser, GstA
 
   if(seq_header->frame_id_numbers_present_flag) {
     seq_header->delta_frame_id_length_minus_2 = gst_av1_read_bits(parser, 4);
-    seq_header->additional_frame_id_length_minus_1 = = gst_av1_read_bits(parser, 3);
+    seq_header->additional_frame_id_length_minus_1 = gst_av1_read_bits(parser, 3);
   }
 
   seq_header->use_128x128_superblock = gst_av1_read_bit(parser);
@@ -762,7 +762,7 @@ GstAV1ParserResult gst_av1_parse_delta_q (GstAV1Parser *parser, gint8 *delta_q)
 
   delta_coded = gst_av1_read_bit(parser);
   if(delta_coded) {
-    delta_q = gst_av1_bitstreamfn_su(parser);
+    delta_q = gst_av1_bitstreamfn_su(parser,7);
     GST_AV1_EVAL_STATUSCODE(parser);
   } else {
     delta_q = 0;
@@ -853,13 +853,13 @@ GstAV1ParserResult gst_av1_parse_segmentation_params (GstAV1Parser *parser, GstA
       for ( gint i = 0; i < GST_AV1_MAX_SEGMENTS; i++ ) {
         for ( gint j = 0; j < GST_AV1_SEG_LVL_MAX; j++ ) {
           seg_params->FeatureEnabled[i][j] = gst_av1_read_bit(parser);
-          int clipped_value = 0;
-          int feature_value = 0;
+          gint clipped_value = 0;
+          gint feature_value = 0;
           if( seg_params->FeatureEnabled[i][j] ) {
-            int bitsToRead = Segmentation_Feature_Bits[j];
-            int limit = Segmentation_Feature_Max[j];
+            gint bitsToRead = Segmentation_Feature_Bits[j];
+            gint limit = Segmentation_Feature_Max[j];
             if( Segmentation_Feature_Signed [j] ) {
-              feature_value = gst_av1_bitstreamfn_su(parser);
+              feature_value = gst_av1_bitstreamfn_su(parser,bitsToRead);
               GST_AV1_EVAL_STATUSCODE(parser);
               clipped_value = gst_av1_clip3(limit * (-1), limit, feature_value);
             } else {
@@ -881,12 +881,12 @@ GstAV1ParserResult gst_av1_parse_segmentation_params (GstAV1Parser *parser, GstA
   }
 
   seg_params->SegIdPreSkip = 0;
-  seg_params->LastActiveSegId = 0:
+  seg_params->LastActiveSegId = 0;
   for ( gint i = 0; i < GST_AV1_MAX_SEGMENTS; i++ ) {
     for ( gint j = 0; j < GST_AV1_SEG_LVL_MAX; j++ ) {
       if ( seg_params->FeatureEnabled[ i ][ j ] ) {
         seg_params->LastActiveSegId = i;
-        if ( gint j >= GST_AV1_SEG_LVL_REF_FRAME ) {
+        if ( j >= GST_AV1_SEG_LVL_REF_FRAME ) {
           seg_params->SegIdPreSkip = 1;
         }
       }
@@ -925,6 +925,7 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
   gint i;
   gint maxWidth, maxHeight;
   gint tile_size_bytes_minus_1;
+  gint startSb, sizeSb;
 
   GST_AV1_STATUS_HELPER(parser);
 
@@ -968,7 +969,7 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
     tile_info->TileRows = i;
   } else {
     gint widestTileSb = 0;
-    gint startSb = 0;
+    startSb = 0;
     for ( i = 0; startSb < sbCols; i++ ) {
       tile_info->MiColStarts[ i ] = startSb << sbShift;
       maxWidth = Min(sbCols - startSb, maxTileWidthSb);
@@ -987,10 +988,10 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
     else
       maxTileAreaSb= sbRows * sbCols;
 
-    maxTileHeightSb = Max( maxTileAreaSb / widestTileSb, 1 );
+    gint maxTileHeightSb = Max( maxTileAreaSb / widestTileSb, 1 );
 
 
-    startSb = 0;
+    gint startSb = 0;
     for ( i = 0; startSb < sbRows; i++ ) {
       tile_info->MiRowStarts[ i ] = startSb << sbShift;
       maxHeight = Min(sbRows - startSb, maxTileHeightSb);
@@ -1057,9 +1058,9 @@ GstAV1ParserResult gst_av1_parse_loop_filter_params (GstAV1Parser *parser, GstAV
           GST_AV1_EVAL_STATUSCODE(parser);
         }
       }
-      for ( int i = 0; i < 2; i++ ) {
-        lf_params->update_mode_deltas = gst_av1_read_bit(parser);
-        if ( lf_params->update_mode_deltas ) {
+      for ( gint i = 0; i < 2; i++ ) {
+        lf_params->update_mode_deltas[i] = gst_av1_read_bit(parser);
+        if ( lf_params->update_mode_deltas[i] ) {
           lf_params->loop_filter_mode_deltas[i]= gst_av1_bitstreamfn_su(parser,7);
           GST_AV1_EVAL_STATUSCODE(parser);
         }
@@ -1248,8 +1249,8 @@ GstAV1ParserResult gst_av1_parse_skip_mode_params (GstAV1Parser *parser, GstAV1F
       skipModeAllowed = 0;
     } else if ( backwardIdx >= 0 ) {
       skipModeAllowed = 1;
-      frame_header->SkipModeFrame[ 0 ] = GST_AV1_LAST_FRAME + Min(forwardIdx, backwardIdx);
-      frame_header->SkipModeFrame[ 1 ] = GST_AV1_LAST_FRAME + Max(forwardIdx, backwardIdx);
+      frame_header->SkipModeFrame[ 0 ] = GST_AV1_REF_LAST_FRAME + Min(forwardIdx, backwardIdx);
+      frame_header->SkipModeFrame[ 1 ] = GST_AV1_REF_LAST_FRAME + Max(forwardIdx, backwardIdx);
     } else {
       int secondForwardIdx = -1;
       int secondForwardHint = 0;
@@ -1267,8 +1268,8 @@ GstAV1ParserResult gst_av1_parse_skip_mode_params (GstAV1Parser *parser, GstAV1F
         skipModeAllowed = 0;
       } else {
         skipModeAllowed = 1;
-        frame_header->SkipModeFrame[ 0 ] = GST_AV1_LAST_FRAME + Min(forwardIdx, secondForwardIdx);
-        frame_header->SkipModeFrame[ 1 ] = GST_AV1_LAST_FRAME + Max(forwardIdx, secondForwardIdx);
+        frame_header->SkipModeFrame[ 0 ] = GST_AV1_REF_LAST_FRAME + Min(forwardIdx, secondForwardIdx);
+        frame_header->SkipModeFrame[ 1 ] = GST_AV1_REF_LAST_FRAME + Max(forwardIdx, secondForwardIdx);
       }
     }
   }
@@ -1324,11 +1325,11 @@ int gst_av1_decode_subexp( GstAV1Parser *parser, int numSyms )
 }
 
 
-int gst_av1_decode_unsigned_subexp_with_ref( GstAV1Parser *parser, mx, r ) {
+int gst_av1_decode_unsigned_subexp_with_ref( GstAV1Parser *parser, gint mx, gint r ) {
 
   GST_AV1_STATUS_HELPER(parser);
 
-  int v = gst_av1_decode_subexp( parser, mx )
+  int v = gst_av1_decode_subexp( parser, mx );
   if ( (r << 1) <= mx ) {
     return gst_av1_inverse_recenter(r, v);
   } else {
@@ -1336,7 +1337,7 @@ int gst_av1_decode_unsigned_subexp_with_ref( GstAV1Parser *parser, mx, r ) {
   }
 }
 
-int gst_av1_decode_signed_subexp_with_ref(GstAV1Parser *parser, int low, int high, int r) {
+int gst_av1_decode_signed_subexp_with_ref(GstAV1Parser *parser, gint low, gint high, gint r) {
 
   GST_AV1_STATUS_HELPER(parser);
 
@@ -1389,7 +1390,7 @@ GstAV1ParserResult gst_av1_parse_global_motion_params (GstAV1Parser *parser, Gst
   if ( frame_header->FrameIsIntra )
     return GST_AV1_PARSER_OK;
 
-  for ( int ref = GST_AV1_LAST_FRAME; ref <= GST_AV1_ALTREF_FRAME; ref++ ) {
+  for ( int ref = GST_AV1_REF_LAST_FRAME; ref <= GST_AV1_REF_ALTREF_FRAME; ref++ ) {
     gm_params->is_global[ref] = gst_av1_read_bit(parser);
     if ( gm_params->is_global[ref] ) {
       gm_params->is_rot_zoom[ref] = gst_av1_read_bit(parser);
@@ -1565,7 +1566,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
         frame_header->display_frame_id = gst_av1_read_bits(parser,idLen);
       }
 
-      frame_header->frame_type= RefFrameType[ frame_to_show_map_idx ] // TODO: RefFrameType not available in the scope yet!!!
+      frame_header->frame_type= RefFrameType[ frame_header->frame_to_show_map_idx ];// TODO: RefFrameType not available in the scope yet!!!
 
       if ( frame_header->frame_type == GST_AV1_KEY_FRAME ) {
          frame_header->refresh_frame_flags = allFrames;
@@ -1652,12 +1653,12 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
     frame_header->buffer_removal_time_present_flag = gst_av1_read_bit(parser);
     if ( frame_header->buffer_removal_time_present_flag ) {
       for ( gint opNum = 0; opNum <= seq_header->operating_points_cnt_minus_1; opNum++ ) {
-        if ( seq_header->decoder_model_info.decoder_model_present_for_this_op[ opNum ] ) {
+        if ( seq_header->operating_points[opNum].decoder_model_present_for_this_op) {
           gint opPtIdc = seq_header->operating_points[ opNum ].idc;
-          gint inTemporalLayer = ( opPtIdc >> temporal_id ) & 1
-          gint inSpatialLayer = ( opPtIdc >> ( spatial_id + 8 ) ) & 1
+          gint inTemporalLayer = ( opPtIdc >> temporal_id ) & 1;
+          gint inSpatialLayer = ( opPtIdc >> ( spatial_id + 8 ) ) & 1;
           if ( opPtIdc == 0 || ( inTemporalLayer && inSpatialLayer ) )
-            buffer_removal_time = gst_av1_read_bits(parser,seq_header->decoder_model_info.buffer_removal_time_length_minus_1+1);
+            frame_header->buffer_removal_time[ opNum ] = gst_av1_read_bits(parser,seq_header->decoder_model_info.buffer_removal_time_length_minus_1+1);
         }
       }
     }
@@ -1688,7 +1689,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
   if( frame_header->frame_type == GST_AV1_KEY_FRAME || frame_header->frame_type == GST_AV1_INTRA_ONLY_FRAME ) {
     gst_av1_parse_frame_size(parser, frame_header, seq_header);
     gst_av1_parse_render_size(parser, frame_header);
-    if( allow_screen_content_tools && frame_header->UpscaledWidth == frame_header->FrameWidth) {
+    if( frame_header->allow_screen_content_tools && frame_header->UpscaledWidth == frame_header->FrameWidth) {
       frame_header->allow_intrabc = gst_av1_read_bit(parser);
     }
   } else {
@@ -1707,8 +1708,8 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
         frame_header->ref_frame_idx[i] = gst_av1_read_bits(parser,3);
 
       if ( seq_header->frame_id_numbers_present_flag ) {
-        frame_header->delta_frame_id_minus_1 = gst_av1_read_bits(parser,seq_header->delta_frame_id_length_minus_2 + 2)
-        frame_header->expectedFrameId[i] = ((current_frame_id + (1 << idLen) - (seq_header->delta_frame_id_minus_1 + 1) ) % (1 << idLen));
+        frame_header->delta_frame_id_minus_1 = gst_av1_read_bits(parser,seq_header->delta_frame_id_length_minus_2 + 2);
+        frame_header->expectedFrameId[i] = ((frame_header->current_frame_id + (1 << idLen) - (frame_header->delta_frame_id_minus_1 + 1) ) % (1 << idLen));
       }
     }
 
@@ -1733,7 +1734,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
     }
 
     frame_header->is_motion_mode_switchable = gst_av1_read_bit(parser);
-    if ( frame_header->error_resilient_mode || !frame_header->enable_ref_frame_mvs ) {
+    if ( frame_header->error_resilient_mode || !seq_header->enable_ref_frame_mvs ) {
       frame_header->use_ref_frame_mvs = 0;
     } else {
       frame_header->use_ref_frame_mvs = gst_av1_read_bit(parser);
@@ -1742,18 +1743,18 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
 
   if( !frame_header->FrameIsIntra ) {
     for(int i = 0; i < GST_AV1_REFS_PER_FRAME; i++) {
-      int refFrame = GST_AV1_LAST_FRAME + 1;
+      int refFrame = GST_AV1_REF_LAST_FRAME + 1;
       int hint = frame_header->RefOrderHint[frame_header->ref_frame_idx[i]];
       frame_header->OrderHints[refFrame] = hint;
-      if( !frame_header->enable_order_hint) {
+      if( !seq_header->enable_order_hint) {
         frame_header->RefFrameSignBias[refFrame] = 0;
       } else {
-        frame_header->RefFrameSignBias[refFrame] = (get_relative_dist(hint,OrderHint) > 0); //TODO: OrderHint present?
+        frame_header->RefFrameSignBias[refFrame] = (get_relative_dist(hint,frame_header->order_hint) > 0); //TODO: OrderHint present?
       }
     }
   }
   if ( seq_header->reduced_still_picture_header || frame_header->disable_cdf_update )
-    frame_header->disable_frame_end_update_cdf = 1
+    frame_header->disable_frame_end_update_cdf = 1;
   else
     frame_header->disable_frame_end_update_cdf = gst_av1_read_bit(parser);
 
@@ -1766,7 +1767,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
     if ( use_ref_frame_mvs == 1 )
        motion_field_estimation( )
 */
-  ret=gst_av1_parse_tile_info ( *parser, GstAV1TileInfo &(frame_header->tile_info),frame_header,seq_header);
+  ret=gst_av1_parse_tile_info (parser, &(frame_header->tile_info),frame_header,seq_header);
   GST_AV1_EVAL_RETVAL(ret);
 
   ret=gst_av1_parse_quantization_params (parser, &(frame_header->quantization_params),&(seq_header->color_config));
@@ -1793,13 +1794,13 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
   }
 */
   frame_header->CodedLossless = 1;
-  for ( int segmentId = 0; segmentId < GST_AV1_MAX_SEGMENTS; segmentId++ )
-    int qindex = get_qindex( 1, segmentId );
+  for ( gint segmentId = 0; segmentId < GST_AV1_MAX_SEGMENTS; segmentId++ ) {
+    gint qindex = get_qindex( 1, segmentId );
     frame_header->LosslessArray[ segmentId ] = qindex == 0 && frame_header->quantization_params.DeltaQYDc ==
                                                frame_header->quantization_params.DeltaQUAc == 0 && frame_header->quantization_params.DeltaQUDc &&
                                                frame_header->quantization_params.DeltaQVAc == 0 && frame_header->quantization_params.DeltaQVDc;
     if ( !frame_header->LosslessArray[ segmentId ] )
-      frame_header->CodedLossless = 0
+      frame_header->CodedLossless = 0;
     if (  frame_header->quantization_params.using_qmatrix ) {
       if ( frame_header->LosslessArray[ segmentId ] ) {
         frame_header->SegQMLevel[ 0 ][ segmentId ] = 15;
@@ -1832,7 +1833,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
 
   //inlined frame_reference_mode()
   if ( frame_header->FrameIsIntra ) {
-    frame_header->reference_select = 0
+    frame_header->reference_select = 0;
   } else {
     frame_header->reference_select = gst_av1_read_bit(parser);
   }
@@ -1841,7 +1842,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
   GST_AV1_EVAL_RETVAL(ret);
 
 
-  if ( frame_header_>FrameIsIntra ||
+  if ( frame_header->FrameIsIntra ||
        frame_header->error_resilient_mode ||
        !seq_header->enable_warped_motion )
     frame_header->allow_warped_motion = 0;
@@ -1874,13 +1875,13 @@ GstAV1ParserResult gst_av1_parse_tile_list_obu( GstAV1Parser *parser, GstAV1Tile
   tile_list->output_frame_width_in_tiles_minus_1 = gst_av1_read_bits(parser,8);
   tile_list->output_frame_height_in_tiles_minus_1 = gst_av1_read_bits(parser,8);
   tile_list->tile_count_minus_1 = gst_av1_read_bits(parser,16);
-  for ( tile = 0; tile <= tile_count_minus_1; tile++ ) {
+  for ( gint tile = 0; tile <= tile_list->tile_count_minus_1; tile++ ) {
     tile_list->entry[tile].anchor_frame_idx = gst_av1_read_bits(parser,8);
     tile_list->entry[tile].anchor_tile_row = gst_av1_read_bits(parser,8);
     tile_list->entry[tile].anchor_tile_col = gst_av1_read_bits(parser,8);
     tile_list->entry[tile].tile_data_size_minus_1 = gst_av1_read_bits(parser,16);
     //skip ofer coded_tile_data
-    gst_av1_bit_reader_skip_bytes(parse,tile_list->entry[tile].tile_data_size_minus_1+1));
+    gst_av1_bit_reader_skip_bytes(parser,tile_list->entry[tile].tile_data_size_minus_1+1);
   }
 
   return GST_AV1_PARSER_OK;
@@ -1891,36 +1892,37 @@ GstAV1ParserResult gst_av1_parse_tile_group_obu( GstAV1Parser *parser, GstAV1Siz
 {
   GstAV1ParserResult ret;
 
+
   GST_AV1_STATUS_HELPER(parser);
 
   bzero(tile_group,sizeof(GstAV1TileGroupOBU));
 
   tile_group->NumTiles = frame_header->tile_info.TileCols * frame_header->tile_info.TileRows;
-  int startBitPos = gst_av1_bit_reader_get_pos(parser);
+  gint startBitPos = gst_av1_bit_reader_get_pos(parser);
   tile_group->tile_start_and_end_present_flag=0;
 
   if ( tile_group->NumTiles > 1 )
     tile_group->tile_start_and_end_present_flag = gst_av1_read_bit(parser);
   if ( tile_group->NumTiles == 1 || !tile_group->tile_start_and_end_present_flag ) {
     tile_group->tg_start = 0;
-    tg_end = NumTiles - 1;
+    tile_group->tg_end = tile_group->NumTiles - 1;
   } else {
-    int tileBits = frame_header->tile_info.TileColsLog2 + frame_header->tile_info.TileRowsLog2;
-    tg_start = gst_av1_read_bits(parser,tileBits);
-    tg_end = gst_av1_read_bits(parser,tileBits);
+    gint tileBits = frame_header->tile_info.TileColsLog2 + frame_header->tile_info.TileRowsLog2;
+    tile_group->tg_start = gst_av1_read_bits(parser,tileBits);
+    tile_group->tg_end = gst_av1_read_bits(parser,tileBits);
   }
 
   gst_av1_bit_reader_skip_to_byte(parser);
 
-  int endBitPos = gst_av1_bit_reader_get_pos(parser);
-  int headerBytes = (endBitPos - startBitPos) / 8;
+  gint endBitPos = gst_av1_bit_reader_get_pos(parser);
+  gint headerBytes = (endBitPos - startBitPos) / 8;
   sz -= headerBytes;
 
-  for ( int TileNum = tg_start; TileNum <= tg_end; TileNum++ ) {
+  for ( int TileNum = tile_group->tg_start; TileNum <= tile_group->tg_end; TileNum++ ) {
     tile_group->entry[TileNum].tileRow = TileNum / frame_header->tile_info.TileCols;
     tile_group->entry[TileNum].tileCol = TileNum % frame_header->tile_info.TileCols;
     //if last tile
-    if (TileNum == tg_end) {
+    if (TileNum == tile_group->tg_end) {
       tile_group->entry[TileNum].tileSize = sz;
     } else {
       int tile_size_minus_1 = gst_av1_bitstreamfn_le(parser,frame_header->tile_info.TileSizeBytes);
@@ -1938,7 +1940,7 @@ GstAV1ParserResult gst_av1_parse_tile_group_obu( GstAV1Parser *parser, GstAV1Siz
       decode_tile( )
       exit_symbol( )
     */
-    gst_av1_bit_reader_skip_bytes(parser,tile_group->entry[TileNum].tileSize):
+    gst_av1_bit_reader_skip_bytes(parser,tile_group->entry[TileNum].tileSize);
   }
 
   if ( tile_group->tg_end == tile_group->NumTiles - 1 ) {
@@ -1954,7 +1956,7 @@ GstAV1ParserResult gst_av1_parse_tile_group_obu( GstAV1Parser *parser, GstAV1Siz
   return GST_AV1_PARSER_OK;
 }
 
-GstAV1ParserResult gst_av1_parse_frame_header_obu( GstAV1Parser *parser,  GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header) {
+GstAV1ParserResult gst_av1_parse_frame_header_obu( GstAV1Parser *parser,  GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
   GstAV1ParserResult ret;
 
@@ -1964,7 +1966,7 @@ GstAV1ParserResult gst_av1_parse_frame_header_obu( GstAV1Parser *parser,  GstAV1
     //frame_header holds vaild data
     return GST_AV1_PARSER_OK;
   } else {
-    ret = gst_av1_parse_uncompressed_frame_header(parser,frame_header,seq_header)
+    ret = gst_av1_parse_uncompressed_frame_header(parser,frame_header,seq_header);
     GST_AV1_EVAL_RETVAL(ret);
 
     frame_header->SeenFrameHeader = 1;
@@ -1981,7 +1983,7 @@ GstAV1ParserResult gst_av1_parse_frame_header_obu( GstAV1Parser *parser,  GstAV1
   return GST_AV1_PARSER_OK;
 }
 
-GstAV1ParserResult gst_av1_parse_frame_obu( GstAV1Parser *parser, GstAV1Size sz, GstAV1TileGroupOBU *tile_group, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header) {
+GstAV1ParserResult gst_av1_parse_frame_obu( GstAV1Parser *parser, GstAV1Size sz, GstAV1TileGroupOBU *tile_group, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
   GstAV1ParserResult ret;
 
@@ -1995,9 +1997,9 @@ GstAV1ParserResult gst_av1_parse_frame_obu( GstAV1Parser *parser, GstAV1Size sz,
 
   gst_av1_bit_reader_skip_to_byte(parser);
 
-  int endBitPos = gst_av1_bit_reader_get_pos(parser);
-  int headerBytes = (endBitPos - startBitPos) / 8;
-  int sz -= headerBytes;
+  gint endBitPos = gst_av1_bit_reader_get_pos(parser);
+  gint headerBytes = (endBitPos - startBitPos) / 8;
+  sz -= headerBytes;
   ret = gst_av1_parse_tile_group_obu(parser, sz, tile_group, frame_header);
   GST_AV1_EVAL_RETVAL(ret);
 

@@ -84,12 +84,16 @@ G_BEGIN_DECLS
 #define GST_AV1_GM_ABS_TRANS_BITS 12
 #define GST_AV1_GM_ABS_TRANS_ONLY_BITS 9
 #define GST_AV1_GM_ABS_ALPHA_BITS 12
+#define GST_AV1_GM_ALPHA_PREC_BITS 15
 #define GST_AV1_GM_TRANS_PREC_BITS 6
 #define GST_AV1_GM_TRANS_ONLY_PREC_BITS 3
 #define GST_AV1_WARPEDMODEL_PREC_BITS 16
 #define GST_AV1_SELECT_SCREEN_CONTENT_TOOLS 2
 #define GST_AV1_SELECT_INTEGER_MV 2
 #define GST_AV1_RESTORATION_TILESIZE_MAX 256
+#define GST_AV1_SEG_LVL_REF_FRAME 5
+
+typedef guint32 GstAV1Size;
 
 typedef struct _GstAV1Parser GstAV1Parser;
 
@@ -372,6 +376,23 @@ typedef enum {
   GST_AV1_FRAME_RESTORE_SWITCHABLE = 3,
 } GstAV1FrameRestorationType;
 
+
+/**
+ * GstAV1ReferenceFrame:
+ *
+ */
+ // TODO: Reference Numbers need to checked
+
+typedef enum {
+  GST_AV1_REF_INTRA_FRAME,
+  GST_AV1_REF_LAST_FRAME,
+  GST_AV1_REF_LAST2_FRAME,
+  GST_AV1_REF_LAST3_FRAME,
+  GST_AV1_REF_BWDREF_FRAME,
+  GST_AV1_REF_GOLDEN_FRAME,
+  GST_AV1_REF_ALTREF_FRAME,
+  GST_AV1_REF_ALTREF2_FRAME,
+} GstAV1ReferenceFrame;
 
 /**
  * GstAV1WarpModelType:
@@ -1470,7 +1491,7 @@ struct _GstAV1FrameHeaderOBU {
   guint32 RefFrameSignBias[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
   guint8 CodedLossless;
   guint8 AllLossless;
-  guint8 LossLessArray[GST_AV1_MAX_SEGMENTS];
+  guint8 LosslessArray[GST_AV1_MAX_SEGMENTS];
   guint8 SegQMLevel[3][GST_AV1_MAX_SEGMENTS];
   guint8 skipModeAllowed;
   guint8 SkipModeFrame[2]; // is 2 appropiat?
