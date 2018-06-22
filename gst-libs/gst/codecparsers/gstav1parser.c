@@ -36,33 +36,33 @@
 #include <gst/base/gstbitreader.h>
 #include "gstav1parser.h"
 
-#define GST_AV1_STATUS_HELPER(parser) parser->debuginfo.last_func = __func__; \\
-                                      parser->statuscode = GST_AV1_PARSE_OK
+#define GST_AV1_STATUS_HELPER(parser) parser->debuginfo.last_func = __func__; \
+                                      parser->statuscode = GST_AV1_PARSER_OK
 
-#define GST_AV1_EVAL_RETVAL(ret) if (ret != GST_AV1_PARSE_OK) return ret
-#define GST_AV1_EVAL_STATUSCODE(parser) parser->debuginfo.line = __LINE__; if (parser->statuscode != GST_AV1_PARSE_OK) return parser->statuscode
+#define GST_AV1_EVAL_RETVAL(ret) if (ret != GST_AV1_PARSER_OK) return ret
+#define GST_AV1_EVAL_STATUSCODE(parser) parser->debuginfo.line = __LINE__; if (parser->statuscode != GST_AV1_PARSER_OK) return parser->statuscode
 #define GST_AV1_SET_STATUSCODE(parser,code) parser->statuscode = code
 
 
 
-#define gst_av1_read_bit(parser) gst_av1_read_bits_checked(parser,1); \\
+#define gst_av1_read_bit(parser) gst_av1_read_bits_checked(parser,1); \
                                  GST_AV1_EVAL_STATUSCODE(parser)
 
-#define gst_av1_read_bits(parser, nbits) gst_av1_read_bits_checked(parser,nbits); \\
+#define gst_av1_read_bits(parser, nbits) gst_av1_read_bits_checked(parser,(nbits)); \
                                          GST_AV1_EVAL_STATUSCODE(parser)
 
-#define gst_av1_bit_reader_skip(parser, nbits) if (gst_bit_reader_skip(parser->br,bits)) \\
-                                                 GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_OK); \\
-                                               else \\
-                                                 GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_SKIPBITS_ERROR); \\
+#define gst_av1_bit_reader_skip(parser, nbits) if (gst_bit_reader_skip(parser->br,(nbits))) \
+                                                 GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_OK); \
+                                               else \
+                                                 GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_SKIPBITS_ERROR); \
                                                GST_AV1_EVAL_STATUSCODE(parser)
 
 #define gst_av1_bit_reader_skip_bytes(parser,nbytes) gst_av1_bit_reader_skip(parser,(nbytes)*8)
 
-#define gst_av1_bit_reader_skip_to_byte(parser) if (gst_bit_reader_skip_to_byte(parser->br)) \\
-                                                  GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_OK); \\
-                                                else \\
-                                                  GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_SKIPBITS_ERROR); \\
+#define gst_av1_bit_reader_skip_to_byte(parser) if (gst_bit_reader_skip_to_byte(parser->br)) \
+                                                  GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_OK); \
+                                                else \
+                                                  GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_SKIPBITS_ERROR); \
                                                 GST_AV1_EVAL_STATUSCODE(parser)
 
 #define gst_av1_bit_reader_get_pos(parser) gst_bit_reader_get_pos(parser->br)
@@ -74,10 +74,10 @@ guint64 gst_av1_read_bits_checked(GstAV1Parser *parser, guint nbits)
   guint64 read_bits;
   gboolean result;
 
-  result = gst_bit_reader_get_bits_uint64(parser->br,&read_bits,nbits)
+  result = gst_bit_reader_get_bits_uint64(parser->br,&read_bits,nbits);
 
   if(result == TRUE) {
-    GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSE_OK);
+    GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_OK);
     return read_bits;
   } else {
     GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_READBITS_ERROR);
@@ -87,10 +87,10 @@ guint64 gst_av1_read_bits_checked(GstAV1Parser *parser, guint nbits)
 
 
 
-guint32 gst_av1_bistreamfn_leb128(GstAV1Parser *parser)
+guint32 gst_av1_bitstreamfn_leb128(GstAV1Parser *parser)
 {
   guint8 leb128_byte;
-  guint value = 0;
+  guint64 value = 0;
 
   GST_AV1_STATUS_HELPER(parser);
 
@@ -101,8 +101,8 @@ guint32 gst_av1_bistreamfn_leb128(GstAV1Parser *parser)
           break;
       }
   }
-  if (value < ((1 << 32) - 1))) { //check for bitstream conformance see chapter4.10.5
-    return value;
+  if (value < GUINT32_MAX) { //check for bitstream conformance see chapter4.10.5
+    return (guint32)value;
   } else {
     GST_AV1_SET_STATUSCODE(parser,GST_AV1_PARSER_BITSTREAM_ERROR);
     return 0;
@@ -119,14 +119,14 @@ guint32 gst_av1_bistreamfn_uvlc(GstAV1Parser *parser)
   GST_AV1_STATUS_HELPER(parser);
 
   while(1) {
-    done = gst_av1_read_bit(parser)
+    done = gst_av1_read_bit(parser);
     if(done) {
       break;
     }
     leadingZero ++;
   }
   if (leadingZero >= 32) {
-    value = (1<<32) - 1;
+    value = GUINT32_MAX;
     return value;
   }
   readv = gst_av1_read_bits(parser,leadingZero);
@@ -151,7 +151,7 @@ guint32 gst_av1_bistreamfn_su(GstAV1Parser *parser, guint8 n)
 }
 
 
-int gst_av1_helpers_FloorLog2( x ) {
+int gst_av1_helpers_FloorLog2( guint32 x ) {
   int s = 0;
 
   while ( x != 0 ) {
@@ -180,6 +180,7 @@ GstAV1ParserResult gst_av1_bitstreamfn_ns(GstAV1Parser *parser, guint8 n , gint8
 guint gst_av1_bitstreamfn_le(GstAV1Parser *parser, guint8 n)
 {
   guint t = 0;
+  guint8 byte;
 
   GST_AV1_STATUS_HELPER(parser);
 
@@ -197,10 +198,10 @@ GstAV1ParserResult gst_av1_parse_obu_header( GstAV1Parser *parser, GstAV1OBUHead
 
   bzero(obu_header,sizeof(GstAV1OBUHeader));
 
-  obo_header->obu_forbidden_bit = gst_av1_read_bit(parser);
+  obu_header->obu_forbidden_bit = gst_av1_read_bit(parser);
 
-  if(obo_header->obu_forbidden_bit != 0)
-    return GST_AV1_PARSER_ERROR;
+  if(obu_header->obu_forbidden_bit != 0)
+    return GST_AV1_PARSER_BITSTREAM_ERROR;
 
   obu_header->obu_type = gst_av1_read_bits(parser, 4);
   obu_header->obu_extention_flag = gst_av1_read_bit(parser);
@@ -208,13 +209,13 @@ GstAV1ParserResult gst_av1_parse_obu_header( GstAV1Parser *parser, GstAV1OBUHead
   obu_header->obu_reserved_1bit = gst_av1_read_bit(parser);
 
   if(obu_header->obu_extention_flag) {
-    obu_header->temporal_id = gst_av1_read_bits(parser, 3);
-    obu_header->spatial_id = gst_av1_read_bits(parser, 2);
-    obu_header->extension_header_reserved_3bits = gst_av1_read_bits(parser, 3);
+    obu_header->obu_temporal_id = gst_av1_read_bits(parser, 3);
+    obu_header->obu_spatial_id = gst_av1_read_bits(parser, 2);
+    obu_header->obu_extension_header_reserved_3bits = gst_av1_read_bits(parser, 3);
   }
 
   if(obu_header->obu_has_size_field) {
-    obu_header->obus_size=gst_av1_bistreamfn_leb128(parser);
+    obu_header->obu_size=gst_av1_bistreamfn_leb128(parser);
     GST_AV1_EVAL_STATUSCODE(parser);
   } else {
     return GST_AV1_PARSER_OK;
@@ -228,17 +229,17 @@ GstAV1ParserResult gst_av1_parse_color_config( GstAV1Parser *parser, GstAV1Color
   color_config->high_bitdepth = gst_av1_read_bit(parser);
   if( seq_profile == 2 && color_config->high_bitdepth) {
     color_config->twelve_bit = gst_av1_read_bit(parser);
-    color_config->BitDepth = color_config->twelve_bit ? 12 : 10
+    color_config->BitDepth = color_config->twelve_bit ? 12 : 10;
   } else if ( seq_profile <= 2 ) {
-    color_config->BitDepth = color_config->high_bitdepth ? 10 : 8
+    color_config->BitDepth = color_config->high_bitdepth ? 10 : 8;
   }
 
   if ( seq_profile == 1 )
     color_config->mono_chrome = 0;
   else
-    mono_chrome = gst_av1_read_bit(parser);
+    color_config->mono_chrome = gst_av1_read_bit(parser);
 
-  color_config->NumPlanes = color_config->mono_chrome ? 1 : 3
+  color_config->NumPlanes = color_config->mono_chrome ? 1 : 3;
 
   color_config->color_description_present_flag = gst_av1_read_bit(parser);
   if ( color_config->color_description_present_flag ) {
@@ -305,7 +306,7 @@ GstAV1ParserResult gst_av1_parse_timing_info( GstAV1Parser *parser, GstAV1Timing
     GST_AV1_EVAL_STATUSCODE(parser);
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 
@@ -320,10 +321,10 @@ GstAV1ParserResult gst_av1_parse_decoder_model_info( GstAV1Parser *parser, GstAV
   decoder_model_info->buffer_removal_time_length_minus_1 = gst_av1_read_bits(parser,5);
   decoder_model_info->frame_presentation_time_length_minus_1 = gst_av1_read_bits(parser,5);
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
-GstAV1ParserResult gst_av1_parse_operating_parameters_info(GstAV1Parser *parser,GstAV1OperatingPoint *op_point, guint8 buffer_delay_length_minus_1);
+GstAV1ParserResult gst_av1_parse_operating_parameters_info(GstAV1Parser *parser,GstAV1OperatingPoint *op_point, GstAV1SequenceHeaderOBU *seq_header)
 {
   GST_AV1_STATUS_HELPER(parser);
 
@@ -332,11 +333,11 @@ GstAV1ParserResult gst_av1_parse_operating_parameters_info(GstAV1Parser *parser,
   op_point->buffer_size_minus_1=gst_av1_bistreamfn_uvlc(parser);
   GST_AV1_EVAL_STATUSCODE(parser);
   op_point->cbr_flag = gst_av1_read_bit(parser);
-  op_point->decoder_buffer_delay = gst_av1_read_bits(parser,buffer_delay_length_minus_1+1)
-  op_point->encoder_buffer_delay = gst_av1_read_bits(parser,buffer_delay_length_minus_1+1)
+  op_point->decoder_buffer_delay = gst_av1_read_bits(parser,seq_header->decoder_model_info.buffer_delay_length_minus_1+1);
+  op_point->encoder_buffer_delay = gst_av1_read_bits(parser,seq_header->decoder_model_info.buffer_delay_length_minus_1+1);
   op_point->low_delay_mode_flag = gst_av1_read_bit(parser);
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstAV1Parser *parser, GstAV1SequenceHeaderOBU *seq_header)
@@ -359,8 +360,8 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstAV1Parser *parser, GstA
     seq_header->operating_points[0].idc = 0;
     seq_header->operating_points[0].seq_level_idx = gst_av1_read_bits(parser, 5);
     seq_header->operating_points[0].seq_tier = 0;
-    seq_header->operating_points[0].decoder_model_present_for_this_op[ 0 ] = 0;
-    seq_header->operating_points[0].initial_display_delay_present_for_this_op[ 0 ] = 0;
+    seq_header->operating_points[0].decoder_model_present_for_this_op = 0;
+    seq_header->operating_points[0].initial_display_delay_present_for_this_op = 0;
   } else {
     seq_header->timing_info_present_flag = gst_av1_read_bit(parser);
 
@@ -390,10 +391,10 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstAV1Parser *parser, GstA
       if ( seq_header->decoder_model_info_present_flag ) {
          seq_header->operating_points[i].decoder_model_present_for_this_op = gst_av1_read_bit(parser);
          if ( seq_header->operating_points[i].decoder_model_present_for_this_op )
-           ret=gst_av1_parse_operating_parameters_info( parser,&(seq_header->operating_points[i]), seq_header->decoder_model_info.buffer_removal_delay_length_minus_1 );
+           ret=gst_av1_parse_operating_parameters_info( parser,&(seq_header->operating_points[i]), seq_header->decoder_model_info.buffer_removal_time_length_minus_1 );
            GST_AV1_EVAL_RETVAL(ret);
       } else {
-        seq_header->operating_points[i].decoder_model_present_for_this_op = 0
+        seq_header->operating_points[i].decoder_model_present_for_this_op = 0;
       }
 
       if ( seq_header->initial_display_delay_present_flag ) {
@@ -408,8 +409,8 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstAV1Parser *parser, GstA
   //OperatingPointIdc = operating_point_idc[ operatingPoint ]
   seq_header->frame_width_bits_minus_1 = gst_av1_read_bits(parser, 4);
   seq_header->frame_height_bits_minus_1 = gst_av1_read_bits(parser, 4);
-  seq_header->max_frame_width_minus_1 = gst_av1_read_bits(parser, frame_width_bits_minus_1+1);
-  seq_header->max_frame_height_minus_1 = gst_av1_read_bits(parser, frame_height_bits_minus_1+1);
+  seq_header->max_frame_width_minus_1 = gst_av1_read_bits(parser, seq_header->frame_width_bits_minus_1+1);
+  seq_header->max_frame_height_minus_1 = gst_av1_read_bits(parser, seq_header->frame_height_bits_minus_1+1);
 
   if(seq_header->reduced_still_picture_header)
     seq_header->frame_id_numbers_present_flag = 0;
@@ -449,20 +450,20 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstAV1Parser *parser, GstA
       seq_header->enable_jnt_comp = 0;
       seq_header->enable_ref_frame_mvs = 0;
     }
-    seq_header->seq_choos_screen_content_tools = gst_av1_read_bit(parser);
-    if( seq_header->seq_choose_integer_mv_screen_content_tools ) {
+    seq_header->seq_choose_screen_content_tools = gst_av1_read_bit(parser);
+    if( seq_header->seq_choose_screen_content_tools )
       seq_header->seq_force_screen_content_tools = GST_AV1_SELECT_SCREEN_CONTENT_TOOLS;
     else
       seq_header->seq_force_screen_content_tools = gst_av1_read_bit(parser);
 
-    if( seq_force_screen_content_tools > 0 ) {
+    if( seq_header->seq_force_screen_content_tools > 0 ) {
       seq_header->seq_choose_integer_mv = gst_av1_read_bit(parser);
-      if( seq_header->seq_choose_integer_mv ) {
-        seq_header->seq_force_integer_mv = SELECT_INTEGER_MV;
+      if( seq_header->seq_choose_integer_mv )
+        seq_header->seq_force_integer_mv = GST_AV1_SELECT_INTEGER_MV;
       else
         seq_header->seq_force_integer_mv = gst_av1_read_bit(parser);
     } else {
-      seq_header->seq_force_integer_mv = SELECT_INTEGER_MV;
+      seq_header->seq_force_integer_mv = GST_AV1_SELECT_INTEGER_MV;
     }
     if( seq_header->enable_order_hint ) {
       seq_header->order_hint_bits_minus_1 = gst_av1_read_bits(parser,3);
@@ -473,25 +474,25 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstAV1Parser *parser, GstA
   }
   seq_header->enable_superres = gst_av1_read_bit(parser);
   seq_header->enable_cdef = gst_av1_read_bit(parser);
-  seq_header->seq_enable_restoration = gst_av1_read_bit(parser);
+  seq_header->enable_restoration = gst_av1_read_bit(parser);
 
-  ret=gst_av1_parse_color_config(parser,seq_header, &(seq_header->color_config));
+  ret=gst_av1_parse_color_config(parser, &(seq_header->color_config),seq_header);
   GST_AV1_EVAL_RETVAL(ret);
 
   seq_header->film_grain_params_present = gst_av1_read_bit(parser);
 
   gst_av1_bit_reader_skip_to_byte(parser);
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
-GstAV1ParserResult gst_av1_temporal_delimiter_obu( GstAV1Parser *parser, GstAV1FrameHeader *frame_header)
+GstAV1ParserResult gst_av1_temporal_delimiter_obu( GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header)
 {
   GST_AV1_STATUS_HELPER(parser);
 
   frame_header->SeenFrameHeader = 0;
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 
@@ -501,12 +502,12 @@ GstAV1ParserResult gst_av1_parse_metadata_itut_t35( GstAV1Parser *parser, GstAV1
 
   itut_t35->itu_t_t35_country_code = gst_av1_read_bits(parser,8);
   if(itut_t35->itu_t_t35_country_code) {
-    itut_t35->itu_t_t35itu_t_t35_country_code_extension_byte = gst_av1_read_bits(parser,8);
+    itut_t35->itu_t_t35_country_code_extention_byte = gst_av1_read_bits(parser,8);
   }
   //TODO: Is skipping bytes necessary here?
   //ommiting itu_t_t35_payload_bytes
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 
@@ -517,7 +518,7 @@ GstAV1ParserResult gst_av1_parse_metadata_hdr_cll( GstAV1Parser *parser, GstAV1M
   hdr_cll->max_cll = gst_av1_read_bits(parser,16);
   hdr_cll->max_fall = gst_av1_read_bits(parser,16);
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_metadata_hdr_mdcv( GstAV1Parser *parser, GstAV1MetadataHdrMdcv *hdr_mdcv)
@@ -535,7 +536,7 @@ GstAV1ParserResult gst_av1_parse_metadata_hdr_mdcv( GstAV1Parser *parser, GstAV1
   hdr_mdcv->luminance_max = gst_av1_read_bits(parser,32);
   hdr_mdcv->luminance_min = gst_av1_read_bits(parser,32);
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_metadata_scalability( GstAV1Parser *parser, GstAV1MetadataScalability *scalability)
@@ -549,31 +550,31 @@ GstAV1ParserResult gst_av1_parse_metadata_scalability( GstAV1Parser *parser, Gst
   scalability->temporal_group_description_present_flag = gst_av1_read_bit(parser);
   scalability->scalability_structure_reserved_3bits = gst_av1_read_bit(parser);
   if ( scalability->spatial_layer_dimensions_present_flag ) {
-    for ( i = 0; i <= scalability->spatial_layers_cnt_minus_1 ; i++ ) {
-      spatial_layer_max_width[i] = gst_av1_read_bits(parser,16);
-      spatial_layer_max_height[i] = gst_av1_read_bits(parser,16);
+    for ( gint i = 0; i <= scalability->spatial_layers_cnt_minus_1 ; i++ ) {
+      scalability->spatial_layer_max_width[i] = gst_av1_read_bits(parser,16);
+      scalability->spatial_layer_max_height[i] = gst_av1_read_bits(parser,16);
     }
   }
 
   if ( scalability->spatial_layer_description_present_flag ) {
-    for ( i = 0; i <= scalability->spatial_layers_cnt_minus_1; i++ )
+    for ( gint i = 0; i <= scalability->spatial_layers_cnt_minus_1; i++ )
       scalability->spatial_layer_ref_id[i] = gst_av1_read_bit(parser);
   }
 
   if ( scalability->temporal_group_description_present_flag ) {
-    scalabilty->temporal_group_size = gst_av1_read_bits(parser,8);
-    for ( i = 0; i < scalability->temporal_group_size; i++ ) {
+    scalability->temporal_group_size = gst_av1_read_bits(parser,8);
+    for ( gint i = 0; i < scalability->temporal_group_size; i++ ) {
       scalability->temporal_group_temporal_id[i] = gst_av1_read_bits(parser,3);
       scalability->temporal_group_temporal_switching_up_point_flag[i] = gst_av1_read_bit(parser);
       scalability->temporal_group_spatial_switching_up_point_flag[i] = gst_av1_read_bit(parser);
-      scalability->temporal_group_ref_cnt[i] = gst_av1_read_bits(parser,3):
-      for ( j = 0; j < temporal_group_ref_cnt[i]; j++ ) {
-        temporal_group_ref_pic_diff[i][j] = gst_av1_read_bits(parser,8);
+      scalability->temporal_group_ref_cnt[i] = gst_av1_read_bits(parser,3);
+      for ( gint j = 0; j < scalability->temporal_group_ref_cnt[i]; j++ ) {
+        scalability->temporal_group_ref_pic_diff[i][j] = gst_av1_read_bits(parser,8);
       }
     }
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_metadata_timecode( GstAV1Parser *parser, GstAV1MetadataTimecode *timecode)
@@ -609,7 +610,7 @@ GstAV1ParserResult gst_av1_parse_metadata_timecode( GstAV1Parser *parser, GstAV1
     timecode->time_offset_value = gst_av1_read_bits(parser,timecode->time_offset_length);
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_metadata_obu(GstAV1Parser *parser, GstAV1MetadataOBU *metadata)
@@ -642,14 +643,14 @@ GstAV1ParserResult gst_av1_parse_metadata_obu(GstAV1Parser *parser, GstAV1Metada
       ret = gst_av1_parse_metadata_timecode(parser,&(metadata->timecode));
       break;
     default:
-      return GST_AV1_PARSE_ERROR;
+      return GST_AV1_PARSER_ERROR;
   }
 
   GST_AV1_EVAL_RETVAL(ret);
 
   gst_av1_bit_reader_skip_to_byte(parser);
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 
@@ -664,53 +665,19 @@ GstAV1ParserResult gst_av1_parse_superres_params_compute_image_size (GstAV1Parse
 
   if(frame_header->use_superres) {
     frame_header->coded_denom = gst_av1_read_bits(parser, GST_AV1_SUPERRES_DENOM_BITS);
-    frame_header->SuperresDenom = coded_denom + SUPERRES_DENOM_MIN;
+    frame_header->SuperresDenom = frame_header->coded_denom + GST_AV1_SUPERRES_DENOM_MIN;
   } else {
-    frame_header->SuperresDenom = SUPERRES_NUM;
+    frame_header->SuperresDenom = GST_AV1_SUPERRES_NUM;
   }
   frame_header->UpscaledWidth = frame_header->FrameWidth;
-  frame_header->FrameWidth = (frame_header->UpscaledWidth * SUPERRES_NUM + (frame_header->SuperresDenom / 2)) / frame_header->SuperresDenom;
+  frame_header->FrameWidth = (frame_header->UpscaledWidth * GST_AV1_SUPERRES_NUM + (frame_header->SuperresDenom / 2)) / frame_header->SuperresDenom;
 
   // compute_image_size:
   frame_header->MiCols = 2 * ( ( frame_header->FrameWidth + 7 ) >> 3 );
   frame_header->MiRows = 2 * ( ( frame_header->FrameHeight + 7 ) >> 3 );
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
-
-GstAV1ParserResult gst_av1_parse_frame_size_with_refs (GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
-{
-  GstAV1ParserResult ret;
-
-  GST_AV1_STATUS_HELPER(parser);
-
-  for ( int i = 0; i < REFS_PER_FRAME; i++ ) {
-    frame_header->found_ref = gst_av1_read_bit(parser);
-    if ( frame_header->found_ref == 1 ) {
-      frame_header->UpscaledWidth = RefUpscaledWidth[frame_header->ref_frame_idx[i]];
-      frame_header->FrameWidth = frame_header->UpscaledWidth;
-      frame_header->FrameHeight = frames_header->RefFrameHeight[frame_header->ref_frame_idx[i]];
-      frame_header->RenderWidth = frame_header->RefRenderWidth[frame_header->ref_frame_idx[i]];
-      frame_header->RenderHeight = RefRenderHeight[frame_header->ref_frame_idx[i]];
-      break;
-    }
-  }
-  if ( frame_header->found_ref == 0 ) {
-    ret=gst_av1_parse_frame_size(parser,frame_header,seq_header);
-    GST_AV1_EVAL_RETVAL(ret);
-
-    ret=gst_av1_parse_render_size(parser,frame_header);
-    GST_AV1_EVAL_RETVAL(ret);
-
-  } else {
-    ret=gst_av1_parse_superres_params_compute_image_size(parser,frame_header,seq_header);
-    GST_AV1_EVAL_RETVAL(ret);
-  }
-
-  return GST_AV1_PARSE_OK;
-
-}
-
 
 GstAV1ParserResult gst_av1_parse_frame_size (GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
@@ -732,7 +699,7 @@ GstAV1ParserResult gst_av1_parse_frame_size (GstAV1Parser *parser, GstAV1FrameHe
   GST_AV1_EVAL_RETVAL(ret);
 
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_render_size (GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header)
@@ -750,8 +717,42 @@ GstAV1ParserResult gst_av1_parse_render_size (GstAV1Parser *parser, GstAV1FrameH
     frame_header->RenderHeight = frame_header->FrameHeight;
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
+
+GstAV1ParserResult gst_av1_parse_frame_size_with_refs (GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
+{
+  GstAV1ParserResult ret;
+
+  GST_AV1_STATUS_HELPER(parser);
+
+  for ( gint i = 0; i < GST_AV1_REFS_PER_FRAME; i++ ) {
+    frame_header->found_ref = gst_av1_read_bit(parser);
+    if ( frame_header->found_ref == 1 ) {
+      frame_header->UpscaledWidth = frame_header->RefUpscaledWidth[frame_header->ref_frame_idx[i]];
+      frame_header->FrameWidth = frame_header->UpscaledWidth;
+      frame_header->FrameHeight = frame_header->RefFrameHeight[frame_header->ref_frame_idx[i]];
+      frame_header->RenderWidth = frame_header->RefRenderWidth[frame_header->ref_frame_idx[i]];
+      frame_header->RenderHeight = frame_header->RefRenderHeight[frame_header->ref_frame_idx[i]];
+      break;
+    }
+  }
+  if ( frame_header->found_ref == 0 ) {
+    ret=gst_av1_parse_frame_size(parser,frame_header,seq_header);
+    GST_AV1_EVAL_RETVAL(ret);
+
+    ret=gst_av1_parse_render_size(parser,frame_header);
+    GST_AV1_EVAL_RETVAL(ret);
+
+  } else {
+    ret=gst_av1_parse_superres_params_compute_image_size(parser,frame_header,seq_header);
+    GST_AV1_EVAL_RETVAL(ret);
+  }
+
+  return GST_AV1_PARSER_OK;
+
+}
+
 
 GstAV1ParserResult gst_av1_parse_delta_q (GstAV1Parser *parser, gint8 *delta_q)
 {
@@ -759,46 +760,53 @@ GstAV1ParserResult gst_av1_parse_delta_q (GstAV1Parser *parser, gint8 *delta_q)
   GST_AV1_STATUS_HELPER(parser);
 
   delta_coded = gst_av1_read_bit(parser);
-  if(delta_codec) {
+  if(delta_coded) {
     delta_q = gst_av1_bitstreamfn_su(parser);
     GST_AV1_EVAL_STATUSCODE(parser);
   } else {
     delta_q = 0;
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_quantization_params (GstAV1Parser *parser, GstAV1QuantizationParams *quant_params, GstAV1ColorConfig *color_config)
 {
-  GST_AV1_STATUS_HELPER(parser);
+  GstAV1ParserResult ret;
 
-  gst_av1_parse_delta_q(parser, &());
+  GST_AV1_STATUS_HELPER(parser);
 
   quant_params->base_q_idx = gst_av1_read_bits(parser,8);
 
-  gst_av1_parse_delta_q(parser, &(quant_params->DeltaQYDc));
+  ret=gst_av1_parse_delta_q(parser, &(quant_params->DeltaQYDc));
+  GST_AV1_EVAL_RETVAL(ret);
 
   if ( color_config->NumPlanes > 1 ) {
     if ( color_config->separate_uv_delta_q )
       quant_params->diff_uv_delta = gst_av1_read_bit(parser);
     else
       quant_params->diff_uv_delta = 0;
-    gst_av1_parse_delta_q(parser, &(quant_params->DeltaQUDc));
-    gst_av1_parse_delta_q(parser, &(quant_params->DeltaQUAc));
+    ret=gst_av1_parse_delta_q(parser, &(quant_params->DeltaQUDc));
+    GST_AV1_EVAL_RETVAL(ret);
+    ret=gst_av1_parse_delta_q(parser, &(quant_params->DeltaQUAc));
+    GST_AV1_EVAL_RETVAL(ret);
 
     if ( quant_params->diff_uv_delta ) {
-      gst_av1_parse_delta_q(parser, &(quant_params->DeltaQVDc));
-      gst_av1_parse_delta_q(parser, &(quant_params->DeltaQVAc));
+      ret=gst_av1_parse_delta_q(parser, &(quant_params->DeltaQVDc));
+      GST_AV1_EVAL_RETVAL(ret);
+
+      ret=gst_av1_parse_delta_q(parser, &(quant_params->DeltaQVAc));
+      GST_AV1_EVAL_RETVAL(ret);
+
     } else {
       quant_params->DeltaQVDc = quant_params->DeltaQUDc;
       quant_params->DeltaQVAc = quant_params->DeltaQUAc;
     }
   } else {
-    quant_params->DeltaQUDc = 0
-    quant_params->DeltaQUAc = 0
-    quant_params->DeltaQVDc = 0
-    quant_params->DeltaQVAc = 0
+    quant_params->DeltaQUDc = 0;
+    quant_params->DeltaQUAc = 0;
+    quant_params->DeltaQVDc = 0;
+    quant_params->DeltaQVAc = 0;
   }
 
   quant_params->using_qmatrix = gst_av1_read_bit(parser);
@@ -813,14 +821,14 @@ GstAV1ParserResult gst_av1_parse_quantization_params (GstAV1Parser *parser, GstA
       quant_params->qm_v = gst_av1_read_bits(parser,4);
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_segmentation_params (GstAV1Parser *parser, GstAV1SegmenationParams *seg_params, GstAV1FrameHeaderOBU *frame_header)
 {
   const guint8 Segmentation_Feature_Bits[GST_AV1_SEG_LVL_MAX ] = { 8 , 6 , 6 , 6 , 6 , 3 , 0 , 0 };
   const guint8 Segmentation_Feature_Signed[ GST_AV1_SEG_LVL_MAX ] = { 1 , 1 , 1 , 1 , 1 , 0 , 0 , 0 };
-  const guint8 Segmentation_Feature_Max[ GST_AV1_SEG_LVL_MAX ] = {255,255, GST_AV1_MAX_LOOP_FILTER, GST_AV1_MAX_LOOP_FILTER,GST_AV1_MAX_LOOP_FILTER,GST_AV1_MAX_LOOP_FILTER, 7 ,0 , 0 };
+  const guint8 Segmentation_Feature_Max[ GST_AV1_SEG_LVL_MAX ] = {255, GST_AV1_MAX_LOOP_FILTER, GST_AV1_MAX_LOOP_FILTER,GST_AV1_MAX_LOOP_FILTER,GST_AV1_MAX_LOOP_FILTER, 7 ,0 , 0 };
 
   GST_AV1_STATUS_HELPER(parser);
 
@@ -837,12 +845,12 @@ GstAV1ParserResult gst_av1_parse_segmentation_params (GstAV1Parser *parser, GstA
       seg_params->segmentation_update_map = gst_av1_read_bit(parser);
       if ( seg_params->segmentation_update_map )
         seg_params->segmentation_temporal_update = gst_av1_read_bit(parser);
-      segmentation_update_data = gst_av1_read_bit(parser);
+      seg_params->segmentation_update_data = gst_av1_read_bit(parser);
     }
 
     if ( seg_params->segmentation_update_data) {
-      for ( int i = 0; i < GST_AV1_MAX_SEGMENTS; i++ ) {
-        for ( int j = 0; j < GST_AV1_SEG_LVL_MAX; j++ ) {
+      for ( gint i = 0; i < GST_AV1_MAX_SEGMENTS; i++ ) {
+        for ( gint j = 0; j < GST_AV1_SEG_LVL_MAX; j++ ) {
           seg_params->FeatureEnabled[i][j] = gst_av1_read_bit(parser);
           int clipped_value = 0;
           int feature_value = 0;
@@ -863,28 +871,28 @@ GstAV1ParserResult gst_av1_parse_segmentation_params (GstAV1Parser *parser, GstA
       }
     }
   } else {
-    for ( i = 0; i < GST_AV1_MAX_SEGMENTS; i++ ) {
-      for ( j = 0; j < GST_AV1_SEG_LVL_MAX; j++ ) {
+    for ( gint i = 0; i < GST_AV1_MAX_SEGMENTS; i++ ) {
+      for ( gint j = 0; j < GST_AV1_SEG_LVL_MAX; j++ ) {
         seg_params->FeatureEnabled[ i ][ j ] = 0;
         seg_params->FeatureData[ i ][ j ] = 0;
       }
     }
   }
 
-  seg_params->SegIdPreSkip = 0
-  seg_params->LastActiveSegId = 0
-  for ( int i = 0; i < GST_AV1_MAX_SEGMENTS; i++ ) {
-    for ( int j = 0; j < GST_AV1_SEG_LVL_MAX; j++ ) {
+  seg_params->SegIdPreSkip = 0;
+  seg_params->LastActiveSegId = 0:
+  for ( gint i = 0; i < GST_AV1_MAX_SEGMENTS; i++ ) {
+    for ( gint j = 0; j < GST_AV1_SEG_LVL_MAX; j++ ) {
       if ( seg_params->FeatureEnabled[ i ][ j ] ) {
         seg_params->LastActiveSegId = i;
-        if ( j >= GST_AV1_SEG_LVL_REF_FRAME ) {
+        if ( gint j >= GST_AV1_SEG_LVL_REF_FRAME ) {
           seg_params->SegIdPreSkip = 1;
         }
       }
     }
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 int gst_av1_helper_tile_log2( int blkSize, int target ) {
@@ -897,25 +905,25 @@ int gst_av1_helper_tile_log2( int blkSize, int target ) {
 GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo *tile_info, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
 {
 
-  int sbCols = seq_header->use_128x128_superblock ? ( ( frame_header->MiCols + 31 ) >> 5 ) : ( ( frame_header->MiCols + 15 ) >> 4 );
-  int sbRows = seq_header->use_128x128_superblock ? ( ( frame_header->MiRows + 31 ) >> 5 ) : ( ( frame_header->MiRows + 15 ) >> 4 );
-  int sbShift = seq_header->use_128x128_superblock ? 5 : 4;
-  int sbSize = sbShift + 2;
-  int maxTileWidthSb = GST_AV1_MAX_TILE_WIDTH >> sbSize;
-  int maxTileAreaSb = GST_AV1_MAX_TILE_AREA >> ( 2 * sbSize );
-  int minLog2TileCols = gst_av1_helper_tile_log2(maxTileWidthSb, sbCols);
-  int maxLog2TileCols = gst_av1_helper_tile_log2(1, Min(sbCols, MAX_TILE_COLS));
-  int maxLog2TileRows = gst_av1_helper_tile_log2(1, Min(sbRows, MAX_TILE_ROWS));
-  int minLog2Tiles = Max(minLog2TileCols,gst_av1_helper_tile_log2(maxTileAreaSb, sbRows * sbCols));
-  int increment_tile_cols_log2;
-  int increment_tile_rows_log2;
-  int width_in_sbs_minus_1;
-  int tileWidthSb;
-  int height_in_sbs_minus_1;
-  int tileHeightSb;
-  int i;
-  int maxWidth, maxHeight;
-  int tile_size_bytes_minus_1;
+  gint sbCols = seq_header->use_128x128_superblock ? ( ( frame_header->MiCols + 31 ) >> 5 ) : ( ( frame_header->MiCols + 15 ) >> 4 );
+  gint sbRows = seq_header->use_128x128_superblock ? ( ( frame_header->MiRows + 31 ) >> 5 ) : ( ( frame_header->MiRows + 15 ) >> 4 );
+  gint sbShift = seq_header->use_128x128_superblock ? 5 : 4;
+  gint sbSize = sbShift + 2;
+  gint maxTileWidthSb = GST_AV1_MAX_TILE_WIDTH >> sbSize;
+  gint maxTileAreaSb = GST_AV1_MAX_TILE_AREA >> ( 2 * sbSize );
+  gint minLog2TileCols = gst_av1_helper_tile_log2(maxTileWidthSb, sbCols);
+  gint maxLog2TileCols = gst_av1_helper_tile_log2(1, Min(sbCols, MAX_TILE_COLS));
+  gint maxLog2TileRows = gst_av1_helper_tile_log2(1, Min(sbRows, MAX_TILE_ROWS));
+  gint minLog2Tiles = Max(minLog2TileCols,gst_av1_helper_tile_log2(maxTileAreaSb, sbRows * sbCols));
+  gint increment_tile_cols_log2;
+  gint increment_tile_rows_log2;
+  gint width_in_sbs_minus_1;
+  gint tileWidthSb;
+  gint height_in_sbs_minus_1;
+  gint tileHeightSb;
+  gint i;
+  gint maxWidth, maxHeight;
+  gint tile_size_bytes_minus_1;
 
   GST_AV1_STATUS_HELPER(parser);
 
@@ -932,15 +940,15 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
     }
     tileWidthSb = (sbCols + (1 << tile_info->TileColsLog2) - 1) >> tile_info->TileColsLog2;
     i = 0;
-    for ( startSb = 0; startSb < sbCols; startSb += tileWidthSb ) {
+    for ( gint startSb = 0; startSb < sbCols; startSb += tileWidthSb ) {
       tile_info->MiColStarts[ i ] = startSb << sbShift;
       i += 1;
     }
     tile_info->MiColStarts[i] = frame_header->MiCols;
     tile_info->TileCols = i;
 
-    minLog2TileRows = Max( minLog2Tiles - TileColsLog2, 0);
-    maxTileHeightSb = sbRows >> minLog2TileRows;
+    gint minLog2TileRows = Max( minLog2Tiles - tile_info->TileColsLog2, 0);
+    gint maxTileHeightSb = sbRows >> minLog2TileRows;
     tile_info->TileRowsLog2 = minLog2TileRows
     while ( tile_info->TileRowsLog2 < maxLog2TileRows ) {
       increment_tile_rows_log2 = gst_av1_read_bit(parser);
@@ -949,7 +957,7 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
       else
         break;
     }
-    tileHeightSb = (sbRows + (1 << tile_info->TileRowsLog2) - 1) >> tile_info->TileRowsLog2;
+    gint tileHeightSb = (sbRows + (1 << tile_info->TileRowsLog2) - 1) >> tile_info->TileRowsLog2;
     i = 0;
     for ( startSb = 0; startSb < sbRows; startSb += tileHeightSb ) {
       tile_info->MiRowStarts[ i ] = startSb << sbShift;
@@ -958,8 +966,8 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
     tile_info->MiRowStarts[i] = frame_header->MiRows;
     tile_info->TileRows = i;
   } else {
-    widestTileSb = 0
-    startSb = 0
+    gint widestTileSb = 0;
+    gint startSb = 0;
     for ( i = 0; startSb < sbCols; i++ ) {
       tile_info->MiColStarts[ i ] = startSb << sbShift;
       maxWidth = Min(sbCols - startSb, maxTileWidthSb);
@@ -970,7 +978,7 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
     }
     tile_info->MiColStarts[i] = frame_header->MiCols;
     tile_info->TileCols = i;
-    TileColsLog2 = gst_av1_helper_tile_log2(1, TileCols);
+    tile_info->TileColsLog2 = gst_av1_helper_tile_log2(1, tile_info->TileCols);
 
     if ( minLog2Tiles > 0)
       maxTileAreaSb = (sbRows * sbCols) >> (minLog2Tiles + 1);
@@ -982,10 +990,10 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
 
     startSb = 0;
     for ( i = 0; startSb < sbRows; i++ ) {
-      MiRowStarts[ i ] = startSb << sbShift;
+      tile_info->MiRowStarts[ i ] = startSb << sbShift;
       maxHeight = Min(sbRows - startSb, maxTileHeightSb);
       gst_av1_bitstreamfn_ns(parser,maxWidth,&height_in_sbs_minus_1);
-      sizeSb = height_in_sbs_minus_1 + 1;
+      gint sizeSb = height_in_sbs_minus_1 + 1;
       startSb += sizeSb;
     }
 
@@ -1001,7 +1009,7 @@ GstAV1ParserResult gst_av1_parse_tile_info (GstAV1Parser *parser, GstAV1TileInfo
     tile_info->context_update_tile_id = 0;
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_loop_filter_params (GstAV1Parser *parser, GstAV1LoopFilterParams *lf_params, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
@@ -1022,7 +1030,7 @@ GstAV1ParserResult gst_av1_parse_loop_filter_params (GstAV1Parser *parser, GstAV
     for (int i = 0; i < 2; i++ ) {
       lf_params->loop_filter_mode_deltas[i] = 0;
     }
-    return GST_AV1_PARSE_OK;
+    return GST_AV1_PARSER_OK;
   }
 
   lf_params->loop_filter_level[0] = gst_av1_read_bits(parser,6);
@@ -1056,7 +1064,7 @@ GstAV1ParserResult gst_av1_parse_loop_filter_params (GstAV1Parser *parser, GstAV
     }
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_quantizer_index_delta_params (GstAV1Parser *parser, GstAV1QuantizationParams *quant_params)
@@ -1072,7 +1080,7 @@ GstAV1ParserResult gst_av1_parse_quantizer_index_delta_params (GstAV1Parser *par
     quant_params->delta_q_res = gst_av1_read_bits(parser,2);
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_loop_filter_delta_params (GstAV1Parser *parser, GstAV1LoopFilterParams *lf_params, GstAV1FrameHeaderOBU *frame_header)
@@ -1092,7 +1100,7 @@ GstAV1ParserResult gst_av1_parse_loop_filter_delta_params (GstAV1Parser *parser,
     }
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_cdef_params (GstAV1Parser *parser, GstAV1CDEFParams *cdef_params, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
@@ -1107,7 +1115,7 @@ GstAV1ParserResult gst_av1_parse_cdef_params (GstAV1Parser *parser, GstAV1CDEFPa
     cdef_params->cdef_uv_sec_strength[0] = 0;
     cdef_params->cdef_damping_minus_3 = 0;
     //CdefDamping = 3
-    return GST_AV1_PARSE_OK;
+    return GST_AV1_PARSER_OK;
   }
   cdef_params->cdef_damping_minus_3 = gst_av1_read_bits(parser,2);
   //CdefDamping = cdef_damping_minus_3 + 3
@@ -1125,7 +1133,7 @@ GstAV1ParserResult gst_av1_parse_cdef_params (GstAV1Parser *parser, GstAV1CDEFPa
     }
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_loop_restoration_params (GstAV1Parser *parser, GstAV1LoopRestorationParams *lr_params, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
@@ -1144,7 +1152,7 @@ GstAV1ParserResult gst_av1_parse_loop_restoration_params (GstAV1Parser *parser, 
     lr_params->FrameRestorationType[0] = GST_AV1_FRAME_RESTORE_NONE;
     lr_params->FrameRestorationType[0] = GST_AV1_FRAME_RESTORE_NONE;
     lr_params->UsesLr = 0;
-    return GST_AV1_PARSE_OK;
+    return GST_AV1_PARSER_OK;
   }
 
   lr_params->UsesLr = 0
@@ -1183,7 +1191,7 @@ GstAV1ParserResult gst_av1_parse_loop_restoration_params (GstAV1Parser *parser, 
     lr_params->LoopRestorationSize[ 2 ] = lr_params->LoopRestorationSize[ 0 ] >> lr_params->lr_uv_shift;
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_tx_mode (GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header)
@@ -1200,7 +1208,7 @@ GstAV1ParserResult gst_av1_parse_tx_mode (GstAV1Parser *parser, GstAV1FrameHeade
       frame_header->TxMode = GST_AV1_TX_MODE_LARGEST;
     }
   }
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_skip_mode_params (GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header)
@@ -1268,7 +1276,7 @@ GstAV1ParserResult gst_av1_parse_skip_mode_params (GstAV1Parser *parser, GstAV1F
     frame_header->skip_mode_present = 0;
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 int gst_av1_inverse_recenter( int r, int v ) {
@@ -1358,7 +1366,7 @@ GstAV1ParserResult gst_av1_parse_global_param (GstAV1Parser *parser, GstAV1Globa
   int r; //Hack-Warning PrevGmParams are not supported yet - bits for reading are defined with mx parameter
   gm_params->gm_params[ref][idx] = (gst_av1_decode_signed_subexp_with_ref(parser,-mx, mx + 1, r )<< precDiff) + wm_round;
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 
@@ -1375,7 +1383,7 @@ GstAV1ParserResult gst_av1_parse_global_motion_params (GstAV1Parser *parser, Gst
     }
 
   if ( frame_header->FrameIsIntra )
-    return GST_AV1_PARSE_OK;
+    return GST_AV1_PARSER_OK;
 
   for ( int ref = GST_AV1_LAST_FRAME; ref <= GST_AV1_ALTREF_FRAME; ref++ ) {
     gm_params->is_global[ref] = gst_av1_read_bit(parser);
@@ -1409,7 +1417,7 @@ GstAV1ParserResult gst_av1_parse_global_motion_params (GstAV1Parser *parser, Gst
     }
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 
@@ -1419,14 +1427,14 @@ GstAV1ParserResult gst_av1_parse_film_grain_params (GstAV1Parser *parser, GstAV1
 
   if(!seq_header->film_grain_params_present || !frame_header->show_frame && !frame_header->showable_frame) {
     //reset_grain_params() //TODO: implement reset_grain_params
-    return GST_AV1_PARSE_OK;
+    return GST_AV1_PARSER_OK;
   }
 
   fg_params->apply_grain = gst_av1_read_bit(parser);
 
   if ( !fg_params->apply_grain ) {
     //reset_grain_params() //TODO: impl.
-    return GST_AV1_PARSE_OK;
+    return GST_AV1_PARSER_OK;
   }
 
   fg_params->grain_seed = gst_av1_read_bits(parser);
@@ -1517,7 +1525,7 @@ GstAV1ParserResult gst_av1_parse_film_grain_params (GstAV1Parser *parser, GstAV1
   fg_params->overlap_flag = gst_av1_read_bit(parser);
   fg_params->clip_to_restricted_range = gst_av1_read_bit(parser);
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header)
@@ -1559,7 +1567,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
       if ( seq_header->film_grain_params_present ) {
       //load_grain_params( frame_to_show_map_idx ) //TODO: load_grain_params
       }
-      return GST_AV1_PARSE_OK;
+      return GST_AV1_PARSER_OK;
     }
 
     frame_header->frame_type = gst_av1_read_bits(parser,2);
@@ -1845,7 +1853,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
 
 
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 
 }
 
@@ -1869,7 +1877,7 @@ GstAV1ParserResult gst_av1_parse_tile_list_obu( GstAV1Parser *parser, GstAV1Tile
     gst_av1_bit_reader_skip_bytes(parse,tile_list->entry[tile].tile_data_size_minus_1+1));
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 
@@ -1937,7 +1945,7 @@ GstAV1ParserResult gst_av1_parse_tile_group_obu( GstAV1Parser *parser, GstAV1Siz
     frame_header->SeenFrameHeader = 0;
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_frame_header_obu( GstAV1Parser *parser,  GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header) {
@@ -1948,7 +1956,7 @@ GstAV1ParserResult gst_av1_parse_frame_header_obu( GstAV1Parser *parser,  GstAV1
 
   if( frame_header->SeenFrameHeader == 1 ) {
     //frame_header holds vaild data
-    return GST_AV1_PARSE_OK;
+    return GST_AV1_PARSER_OK;
   } else {
     ret = gst_av1_parse_uncompressed_frame_header(parser,frame_header,seq_header)
     GST_AV1_EVAL_RETVAL(ret);
@@ -1964,7 +1972,7 @@ GstAV1ParserResult gst_av1_parse_frame_header_obu( GstAV1Parser *parser,  GstAV1
     }
   }
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult gst_av1_parse_frame_obu( GstAV1Parser *parser, GstAV1Size sz, GstAV1TileGroupOBU *tile_group, GstAV1FrameHeaderOBU *frame_header, GstAV1SequenceHeaderOBU *seq_header) {
@@ -1988,5 +1996,5 @@ GstAV1ParserResult gst_av1_parse_frame_obu( GstAV1Parser *parser, GstAV1Size sz,
   GST_AV1_EVAL_RETVAL(ret);
 
 
-  return GST_AV1_PARSE_OK;
+  return GST_AV1_PARSER_OK;
 }

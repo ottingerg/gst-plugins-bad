@@ -42,13 +42,23 @@
 #warning "You can define GST_USE_UNSTABLE_API to avoid this warning."
 #endif
 
+#include <stdint.h>
 #include <gst/gst.h>
 #include <gst/codecparsers/codecparsers-prelude.h>
 
 G_BEGIN_DECLS
 
+#define GUINT32_MAX UINT32_MAX
+
+
+//TODO: Import all Defines from SPEC
+
 #define GST_AV1_MAX_OPERATING_POINTS 32
 #define GST_AV1_MAX_TILE_COUNT 512
+#define GST_AV1_MAX_TILE_WIDTH 4096
+#define GST_AV1_MAX_TILE_AREA (4096*2304)
+#define GST_AV1_MAX_TILE_ROWS 64
+#define GST_AV1_MAX_TILE_COLS 64
 #define GST_AV1_MAX_SPATIAL_LAYERS 2 //is this correct??
 #define GST_AV1_MAX_TEMPORAL_GROUP_SIZE 8 //is this correct??
 #define GST_AV1_MAX_TEMPORAL_GROUP_REFERENCES 8 //is this correct??
@@ -58,9 +68,9 @@ G_BEGIN_DECLS
 #define GST_AV1_MAX_TILE_COLS 64
 #define GST_AV1_MAX_TILE_ROWS 64
 #define GST_AV1_CDEF_MAX (1<<3)
-#define GST_AV1_MAX_NUM_Y_POINTS 15
-#define GST_AV1_MAX_NUM_CB_POINTS 15
-#define GST_AV1_MAX_NUM_CR_POINTS 15
+#define GST_AV1_MAX_NUM_Y_POINTS 16
+#define GST_AV1_MAX_NUM_CB_POINTS 16
+#define GST_AV1_MAX_NUM_CR_POINTS 16
 #define GST_AV1_MAX_NUM_POS_LUMA 25
 #define GST_AV1_NUM_REF_FRAMES 8
 #define GST_AV1_REFS_PER_FRAME 7
@@ -73,20 +83,49 @@ G_BEGIN_DECLS
 #define GST_AV1_GM_ABS_TRANS_BITS 12
 #define GST_AV1_GM_ABS_TRANS_ONLY_BITS 9
 #define GST_AV1_GM_ABS_ALPHA_BITS 12
-#define
+#define GST_AV1_SELECT_SCREEN_CONTENT_TOOLS 2
+#define GST_AV1_SELECT_INTEGER_MV 2
+
+typedef struct _GstAV1Parser GstAV1Parser;
+
+typedef struct _GstAV1OBUHeader GstAV1OBUHeader;
+
+typedef struct _GstAV1SequenceHeaderOBU GstAV1SequenceHeaderOBU;
+typedef struct _GstAV1MetadataOBU GstAV1MetadataOBU;
+typedef struct _GstAV1FrameHeaderOBU GstAV1FrameHeaderOBU;
+typedef struct _GstAV1TileListOBU GstAV1TileListOBU;
+typedef struct _GstAV1TileGroupOBU GstAV1TileGroupOBU;
+
+typedef struct _GstAV1OperatingPoint GstAV1OperatingPoint;
+typedef struct _GstAV1DecoderModelInfo GstAV1DecoderModelInfo;
+typedef struct _GstAV1TimingInfo GstAV1TimingInfo;
+typedef struct _GstAV1ColorConfig GstAV1ColorConfig;
+typedef struct _GstAV1MetadataITUT_T35 GstAV1MetadataITUT_T35;
+typedef struct _GstAV1MetadataHdrCll GstAV1MetadataHdrCll;
+typedef struct _GstAV1MetadataHdrMdcv GstAV1MetadataHdrMdcv;
+typedef struct _GstAV1MetadataScalability GstAV1MetadataScalability;
+typedef struct _GstAV1MetadataTimecode GstAV1MetadataTimecode;
+typedef struct _GstAV1LoopFilterParams GstAV1LoopFilterParams;
+typedef struct _GstAV1QuantizationParams GstAV1QuantizationParams;
+typedef struct _GstAV1SegmenationParams GstAV1SegmenationParams;
+typedef struct _GstAV1TileInfo GstAV1TileInfo;
+typedef struct _GstAV1CDEFParams GstAV1CDEFParams;
+typedef struct _GstAV1LoopRestorationParams GstAV1LoopRestorationParams;
+typedef struct _GstAV1GlobalMotionParams GstAV1GlobalMotionParams;
+typedef struct _GstAV1FilmGrainParams GstAV1FilmGrainParams;
+
 /**
  * GstAV1ParserResult:
  *
  */
 
-typedef enum GstAV1ParserResult {
+typedef enum {
   GST_AV1_PARSER_OK = 0,
   GST_AV1_PARSER_ERROR = 1,
   GST_AV1_PARSER_READBITS_ERROR = 2,
   GST_AV1_PARSER_SKIPBITS_ERROR = 3,
   GST_AV1_PARSER_BITSTREAM_ERROR = 4,
-
-};
+} GstAV1ParserResult;
 
 /**
  * GstAV1OBUType:
@@ -138,13 +177,13 @@ typedef enum {
   GST_AV1_SCALABILITY_L2T3 = 4,
   GST_AV1_SCALABILITY_S2T1 = 5,
   GST_AV1_SCALABILITY_S2T2 = 6,
-  GST_AV1_SCALABILITY_S2T3 = 7
-  GST_AV1_SCALABILITY_L2T1h = 8
-  GST_AV1_SCALABILITY_L2T2h = 9
-  GST_AV1_SCALABILITY_L2T3h =10
-  GST_AV1_SCALABILITY_S2T1h = 11
-  GST_AV1_SCALABILITY_S2T2h = 12
-  GST_AV1_SCALABILITY_S2T3h = 13
+  GST_AV1_SCALABILITY_S2T3 = 7,
+  GST_AV1_SCALABILITY_L2T1h = 8,
+  GST_AV1_SCALABILITY_L2T2h = 9,
+  GST_AV1_SCALABILITY_L2T3h =10,
+  GST_AV1_SCALABILITY_S2T1h = 11,
+  GST_AV1_SCALABILITY_S2T2h = 12,
+  GST_AV1_SCALABILITY_S2T3h = 13,
   GST_AV1_SCALABILITY_SS = 14,
 } GstAV1ScalabilityModes;
 
@@ -349,13 +388,13 @@ typedef enum {
  *
  */
 
-struct GstAV1Parser {
+struct _GstAV1Parser {
   GstBitReader *br;
   GstAV1ParserResult statuscode;
   struct {
     const char *last_func;
     guint line;
-  } debuginfo; 
+  } debuginfo;
 };
 
 /**
@@ -379,11 +418,11 @@ struct _GstAV1OBUHeader {
   GstAV1OBUType obu_type;
   guint8 obu_extention_flag;
   guint8 obu_has_size_field;
-  //guint8 reserved_1bit;
-  guint32 obu_size
+  guint8 obu_reserved_1bit;
+  guint32 obu_size;
   guint8 obu_temporal_id;
   guint8 obu_spatial_id;
-  //guint8 extension_header_reserved_3bits;
+  guint8 obu_extension_header_reserved_3bits;
 };
 
 
@@ -536,7 +575,7 @@ struct _GstAV1ColorConfig {
   guint8 separate_uv_delta_q;
   guint8 BitDepth;
   guint8 NumPlanes;
-}
+};
 
 /**
  * _GstAV1SequenceHeaderOBU:
@@ -666,7 +705,7 @@ struct _GstAV1SequenceHeaderOBU {
  */
 struct _GstAV1MetadataITUT_T35 {
   guint8 itu_t_t35_country_code;
-  guint8 itu_t_t35_country_code_extention_byte
+  guint8 itu_t_t35_country_code_extention_byte;
   // itu_t_t35_payload_bytes - not supported at the moment
 };
 
@@ -837,7 +876,7 @@ struct _GstAV1MetadataTimecode {
   guint8 hours_value;
   guint8 time_offset_length;
   guint32 time_offset_value;
-}:
+};
 
 /**
  * _GstAV1MetadataOBU:
@@ -854,8 +893,8 @@ struct _GstAV1MetadataOBU {
   GstAV1MetadataType metadata_type;
 
   GstAV1MetadataITUT_T35 itut_t35;
-  GstAV1MetadataHdrCll hdrcll;
-  GstAV1MetadataHdrMdcv hdrcmdcv;
+  GstAV1MetadataHdrCll hdr_cll;
+  GstAV1MetadataHdrMdcv hdr_mdcv;
   GstAV1MetadataScalability scalability;
   GstAV1MetadataTimecode timecode;
 };
@@ -895,7 +934,7 @@ struct _GstAV1MetadataOBU {
 struct _GstAV1LoopFilterParams {
   guint8 loop_filter_level[4]; //is 4 fixed??
   guint8 loop_filter_sharpness;
-  guint8 loop_filter_delta_enable;
+  guint8 loop_filter_delta_enabled;
   guint8 loop_filter_delta_update;
 
   guint8 update_ref_deltas[GST_AV1_TOTAL_REFS_PER_FRAME];
@@ -1183,7 +1222,7 @@ struct _GstAV1FilmGrainParams {
   guint8 film_grain_params_ref_idx;
   guint8 num_y_points;
   guint8 point_y_value[GST_AV1_MAX_NUM_Y_POINTS];
-  guint8 point_y_value[GST_AV1_MAX_NUM_Y_POINTS];
+  guint8 point_y_scaling[GST_AV1_MAX_NUM_Y_POINTS];
   guint8 chrome_scaling_from_luma;
   guint8 num_cb_points;
   guint8 point_cb_value[GST_AV1_MAX_NUM_CB_POINTS];
