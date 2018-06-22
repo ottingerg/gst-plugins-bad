@@ -73,7 +73,7 @@ G_BEGIN_DECLS
 #define GST_AV1_GM_ABS_TRANS_BITS 12
 #define GST_AV1_GM_ABS_TRANS_ONLY_BITS 9
 #define GST_AV1_GM_ABS_ALPHA_BITS 12
-#define GST_AV1_MAX_TILES
+#define
 /**
  * GstAV1ParserResult:
  *
@@ -82,6 +82,10 @@ G_BEGIN_DECLS
 typedef enum GstAV1ParserResult {
   GST_AV1_PARSER_OK = 0,
   GST_AV1_PARSER_ERROR = 1,
+  GST_AV1_PARSER_READBITS_ERROR = 2,
+  GST_AV1_PARSER_SKIPBITS_ERROR = 3,
+  GST_AV1_PARSER_BITSTREAM_ERROR = 4,
+
 };
 
 /**
@@ -348,7 +352,10 @@ typedef enum {
 struct GstAV1Parser {
   GstBitReader *br;
   GstAV1ParserResult statuscode;
-  const char *last_func;
+  struct {
+    const char *last_func;
+    guint line;
+  } debuginfo; 
 };
 
 /**
