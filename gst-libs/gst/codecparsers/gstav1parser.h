@@ -80,11 +80,16 @@ G_BEGIN_DECLS
 #define GST_AV1_SUPERRES_DENOM_BITS 3
 #define GST_AV1_MAX_LOOP_FILTER 63
 #define GST_AV1_MAX_NUM_PLANES 3
+#define GST_AV1_GM_ABS_ALPHA_BITS 12
 #define GST_AV1_GM_ABS_TRANS_BITS 12
 #define GST_AV1_GM_ABS_TRANS_ONLY_BITS 9
 #define GST_AV1_GM_ABS_ALPHA_BITS 12
+#define GST_AV1_GM_TRANS_PREC_BITS 6
+#define GST_AV1_GM_TRANS_ONLY_PREC_BITS 3
+#define GST_AV1_WARPEDMODEL_PREC_BITS 16
 #define GST_AV1_SELECT_SCREEN_CONTENT_TOOLS 2
 #define GST_AV1_SELECT_INTEGER_MV 2
+#define GST_AV1_RESTORATION_TILESIZE_MAX 256
 
 typedef struct _GstAV1Parser GstAV1Parser;
 
@@ -1223,7 +1228,7 @@ struct _GstAV1FilmGrainParams {
   guint8 num_y_points;
   guint8 point_y_value[GST_AV1_MAX_NUM_Y_POINTS];
   guint8 point_y_scaling[GST_AV1_MAX_NUM_Y_POINTS];
-  guint8 chrome_scaling_from_luma;
+  guint8 chroma_scaling_from_luma;
   guint8 num_cb_points;
   guint8 point_cb_value[GST_AV1_MAX_NUM_CB_POINTS];
   guint8 point_cb_scaling[GST_AV1_MAX_NUM_CB_POINTS];
@@ -1386,6 +1391,7 @@ struct _GstAV1FilmGrainParams {
  *               loop restoration are disabled.
  * @LossLessArray:
  * @SegQMLevel:
+ * @skipModeAllowed:
  * @SkipModeFrame[]: specifies the frames to use for compound prediction when skip_mode is equal to 1.
  */
 
@@ -1420,7 +1426,7 @@ struct _GstAV1FrameHeaderOBU {
   guint32 delta_frame_id_minus_1; // present in for loop --> check obu.c
   guint8 allow_high_precision_mv;
   guint8 is_motion_mode_switchable;
-  guint8 use_ref_frames_mvs;
+  guint8 use_ref_frame_mvs;
   guint8 disable_frame_end_update_cdf;
   guint8 allow_warped_motion;
   guint8 reduced_tx_set;
@@ -1466,6 +1472,7 @@ struct _GstAV1FrameHeaderOBU {
   guint8 AllLossless;
   guint8 LossLessArray[GST_AV1_MAX_SEGMENTS];
   guint8 SegQMLevel[3][GST_AV1_MAX_SEGMENTS];
+  guint8 skipModeAllowed;
   guint8 SkipModeFrame[2]; // is 2 appropiat?
 
 
