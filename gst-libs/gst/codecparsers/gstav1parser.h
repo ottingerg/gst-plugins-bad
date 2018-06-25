@@ -123,6 +123,8 @@ typedef struct _GstAV1LoopRestorationParams GstAV1LoopRestorationParams;
 typedef struct _GstAV1GlobalMotionParams GstAV1GlobalMotionParams;
 typedef struct _GstAV1FilmGrainParams GstAV1FilmGrainParams;
 
+typedef struct _GstAV1ReferenceFrameInfo GstAV1ReferenceFrameInfo;
+
 /**
  * GstAV1ParserResult:
  *
@@ -1395,10 +1397,7 @@ struct _GstAV1FilmGrainParams {
  * @expectedFrameId[]: specifies the frame id for each frame used for reference. It is a requirement of bitstream conformance
  *                     that whenever expectedFrameId[ i ] is calculated, the value matches RefFrameId[ ref_frame_idx[ i ] ]
  *                     (this contains the value of current_frame_id at the time that the frame indexed by ref_frame_idx was stored).
- * @RefFrameHeight[]:
- * @RefRenderHeight[]:
- * @RefUpscaledWidth[]:
- * @RefRenderWidth[]:
+
  * @OrderHints[]: specifies the expected output order for each reference frame.
  * @RefFrameSignBias[]: specifies the intended direction of the motion vector in time for each reference frame. A sign bias
  *                      equal to 0 indicates that the reference frame is a forwards reference (i.e. the reference frame is expected
@@ -1482,11 +1481,6 @@ struct _GstAV1FrameHeaderOBU {
   GstAV1GlobalMotionParams global_motion_params;
   GstAV1FilmGrainParams film_grain_params;
   guint32 expectedFrameId[GST_AV1_REFS_PER_FRAME];
-  guint32 RefUpscaledWidth[GST_AV1_REFS_PER_FRAME];
-  guint32 RefFrameHeight[GST_AV1_REFS_PER_FRAME];
-  guint32 RefRenderWidth[GST_AV1_REFS_PER_FRAME];
-  guint32 RefRenderHeight[GST_AV1_REFS_PER_FRAME];
-  guint32 RefOrderHint[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
   guint32 OrderHints[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
   guint32 RefFrameSignBias[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
   guint8 CodedLossless;
@@ -1498,6 +1492,37 @@ struct _GstAV1FrameHeaderOBU {
 
 
 };
+
+/**
+ * _GstAV1ReferenceFrameInfo:
+ *
+ * @RefValid:
+ * @RefFrameId:
+ * @RefUpscaledWidth:
+ * @RefFrameHeight:
+ * @RefFrameWidth:
+ * @RefRenderHeight:
+ * @RefRenderWidth:
+ * @RefFrameType:
+ * @RefOrderHint:
+ *
+ * Note: The Reference Info is only partly implemented - check section 7.20 of Spec
+ */
+
+struct _GstAV1ReferenceFrameInfo {
+  struct {
+    guint8 RefValid;
+    guint32 RefFrameId;
+    guint32 RefUpscaledWidth;
+    guint32 RefFrameHeight;
+    guint32 RefFrameWidth;
+    guint32 RefRenderHeight;
+    guint32 RefRenderWidth;
+    guint32 RefFrameType;
+    guint32 RefOrderHint; // is guint32 appropiat?
+  } entry[GST_AV1_REFS_PER_FRAME];
+};
+
 
 /**
  * _GstAV1TileListOBU:
