@@ -1538,6 +1538,20 @@ GstAV1ParserResult gst_av1_parse_film_grain_params (GstAV1Parser *parser, GstAV1
   return GST_AV1_PARSER_OK;
 }
 
+void gst_av1_mark_ref_frames( GstAV1FrameHeaderOBU *frame_header, GstAV1ReferenceFrameInfo *ref_info, GstAV1SequenceHeaderOBU *seq_header, gint idLen ) {
+  gint diffLen = seq_header->delta_frame_id_length_minus_2 + 2;
+  for ( gint i = 0; i < GST_AV1_NUM_REF_FRAMES; i++ ) {
+    if ( frame_header->current_frame_id > ( 1 << diffLen ) ) {
+      if ( ref_info->entry[i].RefFrameId > frame_header->current_frame_id ||
+           ref_info->entry[i].RefFrameId < ( frame_header->current_frame_id - ( 1 << diffLen ) ) )
+        ref_info->entry[i].RefValid = 0;
+    } else {
+      if ( ref_info->entry[i].RefFrameId > frame_header->current_frame_id && ref_info->entry[i].RefFrameId < ( ( 1 << idLen ) + frame_header->current_frame_id - ( 1 << diffLen ) ) )
+        ref_info->entry[i].RefValid = 0;
+    }
+  }
+}
+
 GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser, GstAV1FrameHeaderOBU *frame_header, GstAV1ReferenceFrameInfo *ref_info, GstAV1SequenceHeaderOBU *seq_header)
 {
 
@@ -1609,17 +1623,17 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
     }
   }
 
-  frame_header->disable_cdf_update = gst_av1_bit_read(parser);
+  frame_header->disable_cdf_update = gst_av1_read_bit(parser);
 
   if ( seq_header->seq_force_screen_content_tools == GST_AV1_SELECT_SCREEN_CONTENT_TOOLS ) {
-    frame_header->allow_screen_content_tools = gst_av1_bit_read(parser);
+    frame_header->allow_screen_content_tools = gst_av1_read_bit(parser);
   } else {
     frame_header->allow_screen_content_tools = seq_header->seq_force_screen_content_tools;
   }
 
   if ( frame_header->allow_screen_content_tools ) {
     if ( seq_header->seq_force_integer_mv == GST_AV1_SELECT_INTEGER_MV ) {
-      frame_header->force_integer_mv = gst_av1_bit_read(parser);
+      frame_header->force_integer_mv = gst_av1_read_bit(parser);
     } else {
       frame_header->force_integer_mv = seq_header->seq_force_integer_mv;
     }
@@ -1634,7 +1648,7 @@ GstAV1ParserResult gst_av1_parse_uncompressed_frame_header (GstAV1Parser *parser
   if( seq_header->frame_id_numbers_present_flag ) {
     //PrevFrameID = current_frame_id
     frame_header->current_frame_id = gst_av1_read_bits(parser,idLen);
-    mark_ref_frames(idLen); //TODO: Mark Ref Frames
+    gst_av1_mark_ref_frames(frame_header,ref_info,seq_header,idLen);
   } else {
     frame_header->current_frame_id = 0;
   }
