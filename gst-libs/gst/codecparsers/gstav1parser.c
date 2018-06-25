@@ -216,7 +216,7 @@ GstAV1ParserResult gst_av1_parse_obu_header( GstAV1Parser *parser, GstAV1OBUHead
   }
 
   if(obu_header->obu_has_size_field) {
-    obu_header->obu_size=gst_av1_bistreamfn_leb128(parser);
+    obu_header->obu_size=gst_av1_bitstreamfn_leb128(parser);
     GST_AV1_EVAL_STATUSCODE(parser);
   } else {
     return GST_AV1_PARSER_OK;
@@ -303,7 +303,7 @@ GstAV1ParserResult gst_av1_parse_timing_info( GstAV1Parser *parser, GstAV1Timing
   timing_info->time_scale = gst_av1_read_bits(parser,32);
   timing_info->equal_picture_interval = gst_av1_read_bit(parser);
   if( timing_info->equal_picture_interval ) {
-    timing_info->num_ticks_per_picture_minus_1=gst_av1_bistreamfn_uvlc(parser);
+    timing_info->num_ticks_per_picture_minus_1=gst_av1_bitstreamfn_uvlc(parser);
     GST_AV1_EVAL_STATUSCODE(parser);
   }
 
@@ -329,9 +329,9 @@ GstAV1ParserResult gst_av1_parse_operating_parameters_info(GstAV1Parser *parser,
 {
   GST_AV1_STATUS_HELPER(parser);
 
-  op_point->bitrate_minus_1=gst_av1_bistreamfn_uvlc(parser);
+  op_point->bitrate_minus_1=gst_av1_bitstreamfn_uvlc(parser);
   GST_AV1_EVAL_STATUSCODE(parser);
-  op_point->buffer_size_minus_1=gst_av1_bistreamfn_uvlc(parser);
+  op_point->buffer_size_minus_1=gst_av1_bitstreamfn_uvlc(parser);
   GST_AV1_EVAL_STATUSCODE(parser);
   op_point->cbr_flag = gst_av1_read_bit(parser);
   op_point->decoder_buffer_delay = gst_av1_read_bits(parser,seq_header->decoder_model_info.buffer_delay_length_minus_1+1);
@@ -392,7 +392,7 @@ GstAV1ParserResult gst_av1_parse_sequence_header_obu( GstAV1Parser *parser, GstA
       if ( seq_header->decoder_model_info_present_flag ) {
          seq_header->operating_points[i].decoder_model_present_for_this_op = gst_av1_read_bit(parser);
          if ( seq_header->operating_points[i].decoder_model_present_for_this_op )
-           ret=gst_av1_parse_operating_parameters_info( parser,&(seq_header->operating_points[i]), seq_header->decoder_model_info.buffer_removal_time_length_minus_1 );
+           ret=gst_av1_parse_operating_parameters_info( parser,&(seq_header->operating_points[i]), seq_header );
            GST_AV1_EVAL_RETVAL(ret);
       } else {
         seq_header->operating_points[i].decoder_model_present_for_this_op = 0;
@@ -763,10 +763,10 @@ GstAV1ParserResult gst_av1_parse_delta_q (GstAV1Parser *parser, gint8 *delta_q)
 
   delta_coded = gst_av1_read_bit(parser);
   if(delta_coded) {
-    delta_q = gst_av1_bitstreamfn_su(parser,7);
+    *delta_q = gst_av1_bitstreamfn_su(parser,7);
     GST_AV1_EVAL_STATUSCODE(parser);
   } else {
-    delta_q = 0;
+    *delta_q = 0;
   }
 
   return GST_AV1_PARSER_OK;
@@ -1408,19 +1408,19 @@ GstAV1ParserResult gst_av1_parse_global_motion_params (GstAV1Parser *parser, Gst
     gm_params->GmType[ref] = type;
 
     if ( type >= GST_AV1_WARP_MODEL_ROTZOOM ) {
-      gst_av1_read_global_param(gm_params,type,ref,2);
-      gst_av1_read_global_param(gm_params,type,ref,3);
+      gst_av1_parse_global_param(parser,gm_params,frame_header,type,ref,2);
+      gst_av1_parse_global_param(parser,gm_params,frame_header,type,ref,3);
       if ( type == GST_AV1_WARP_MODEL_AFFINE ) {
-        gst_av1_read_global_param(gm_params,type,ref,4);
-        gst_av1_read_global_param(gm_params,type,ref,5);
+        gst_av1_parse_global_param(parser,gm_params,frame_header,type,ref,4);
+        gst_av1_parse_global_param(parser,gm_params,frame_header,type,ref,5);
       } else {
         gm_params->gm_params[ref][4] = gm_params->gm_params[ref][3]*(-1);
         gm_params->gm_params[ref][5] = gm_params->gm_params[ref][2];
       }
     }
     if ( type >= GST_AV1_WARP_MODEL_TRANSLATION ) {
-      gst_av1_read_global_param(gm_params,type,ref,0);
-      gst_av1_read_global_param(gm_params,type,ref,1);
+      gst_av1_parse_global_param(parser,gm_params,frame_header,type,ref,0);
+      gst_av1_parse_global_param(parser,gm_params,frame_header,type,ref,1);
     }
   }
 
