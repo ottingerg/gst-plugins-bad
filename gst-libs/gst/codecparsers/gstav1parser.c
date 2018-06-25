@@ -223,19 +223,19 @@ GstAV1ParserResult gst_av1_parse_obu_header( GstAV1Parser *parser, GstAV1OBUHead
   }
 }
 
-GstAV1ParserResult gst_av1_parse_color_config( GstAV1Parser *parser, GstAV1ColorConfig *color_config, guint8 seq_profile )
+GstAV1ParserResult gst_av1_parse_color_config( GstAV1Parser *parser, GstAV1ColorConfig *color_config, GstAV1SequenceHeaderOBU *seq_header)
 {
   GST_AV1_STATUS_HELPER(parser);
 
   color_config->high_bitdepth = gst_av1_read_bit(parser);
-  if( seq_profile == 2 && color_config->high_bitdepth) {
+  if( seq_header->seq_profile == 2 && color_config->high_bitdepth) {
     color_config->twelve_bit = gst_av1_read_bit(parser);
     color_config->BitDepth = color_config->twelve_bit ? 12 : 10;
-  } else if ( seq_profile <= 2 ) {
+  } else if ( seq_header->seq_profile <= 2 ) {
     color_config->BitDepth = color_config->high_bitdepth ? 10 : 8;
   }
 
-  if ( seq_profile == 1 )
+  if ( seq_header->seq_profile == 1 )
     color_config->mono_chrome = 0;
   else
     color_config->mono_chrome = gst_av1_read_bit(parser);
@@ -268,10 +268,10 @@ GstAV1ParserResult gst_av1_parse_color_config( GstAV1Parser *parser, GstAV1Color
     color_config->subsampling_y = 0;
   } else {
     color_config->color_range = gst_av1_read_bit(parser);
-    if ( seq_profile == 0 ) {
+    if ( seq_header->seq_profile == 0 ) {
       color_config->subsampling_x = 1;
       color_config->subsampling_y = 1;
-    } else if ( seq_profile == 1 ) {
+    } else if ( seq_header->seq_profile == 1 ) {
       color_config->subsampling_x = 0;
       color_config->subsampling_y = 0;
     } else {
