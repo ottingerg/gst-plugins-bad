@@ -516,8 +516,8 @@ GstAV1ParserResult
 gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
     GstAV1SequenceHeaderOBU * seq_header)
 {
-  gint i;
   GstAV1ParserResult retval;
+  gint i;
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -687,7 +687,6 @@ gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstBitReader * br)
   GST_AV1_DEBUG_HELPER ();
 
   parser->state.SeenFrameHeader = 0;
-
 
   return GST_AV1_PARSER_OK;
 }
@@ -976,9 +975,9 @@ static GstAV1ParserResult
 gst_av1_parse_frame_size_with_refs (GstAV1Parser * parser, GstBitReader * br,
     GstAV1FrameHeaderOBU * frame_header)
 {
-  gint i;
   GstAV1ParserResult retval;
   GstAV1ReferenceFrameInfo *ref_info;
+  gint i;
 
   ref_info = &(parser->ref_info);
 
@@ -1174,11 +1173,12 @@ static GstAV1ParserResult
 gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
     GstAV1TileInfo * tile_info)
 {
-  gint i, startSb;
+  GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
-  GstAV1ParserResult retval;
 
+  gint i;
+  gint startSb;
   gint sbCols;
   gint sbRows;
   gint sbShift;
@@ -1330,10 +1330,10 @@ static GstAV1ParserResult
 gst_av1_parse_loop_filter_params (GstAV1Parser * parser, GstBitReader * br,
     GstAV1LoopFilterParams * lf_params)
 {
-  gint i;
   GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
+  gint i;
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -1455,9 +1455,9 @@ static GstAV1ParserResult
 gst_av1_parse_cdef_params (GstAV1Parser * parser, GstBitReader * br,
     GstAV1CDEFParams * cdef_params)
 {
-  gint i;
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
+  gint i;
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -1507,9 +1507,9 @@ static GstAV1ParserResult
 gst_av1_parse_loop_restoration_params (GstAV1Parser * parser, GstBitReader * br,
     GstAV1LoopRestorationParams * lr_params)
 {
-  gint i;
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
+  gint i;
   const GstAV1FrameRestorationType Remap_Lr_Type[4] = {
     GST_AV1_FRAME_RESTORE_NONE,
     GST_AV1_FRAME_RESTORE_SWITCHABLE,
@@ -1620,9 +1620,9 @@ static GstAV1ParserResult
 gst_av1_parse_skip_mode_params (GstAV1Parser * parser, GstBitReader * br,
     GstAV1FrameHeaderOBU * frame_header)
 {
-  gint i;
   GstAV1ReferenceFrameInfo *ref_info;
   GstAV1SequenceHeaderOBU *seq_header;
+  gint i;
   gint skipModeAllowed;
 
   GST_AV1_DEBUG_HELPER ();
@@ -1789,11 +1789,11 @@ gst_av1_parse_global_param (GstAV1Parser * parser, GstBitReader * br,
     GstAV1GlobalMotionParams * gm_params, GstAV1WarpModelType type, gint ref,
     gint idx)
 {
-  GstAV1FrameHeaderOBU *frame_header;
   GstAV1ParserResult retval;
+  GstAV1FrameHeaderOBU *frame_header;
+  gint precDiff, wm_round, mx, r;
   gint absBits = GST_AV1_GM_ABS_ALPHA_BITS;
   gint precBits = GST_AV1_GM_ALPHA_PREC_BITS;
-  gint precDiff, wm_round, mx, r;
   //gint sub;
 
   GST_AV1_DEBUG_HELPER ();
@@ -1837,9 +1837,9 @@ static GstAV1ParserResult
 gst_av1_parse_global_motion_params (GstAV1Parser * parser, GstBitReader * br,
     GstAV1GlobalMotionParams * gm_params)
 {
-  gint i, ref;
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1WarpModelType type;
+  gint i, ref;
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -1902,9 +1902,9 @@ static GstAV1ParserResult
 gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
     GstAV1FilmGrainParams * fg_params)
 {
-  gint i;
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
+  gint i;
   gint numPosChroma, numPosLuma;
 
   GST_AV1_DEBUG_HELPER ();
@@ -2032,10 +2032,10 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
 static GstAV1ParserResult
 gst_av1_mark_ref_frames (GstAV1Parser * parser, GstBitReader * br, gint idLen)
 {
-  gint i, diffLen;
   GstAV1ReferenceFrameInfo *ref_info;
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
+  gint i, diffLen;
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -2087,10 +2087,10 @@ static GstAV1ParserResult
 gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     GstBitReader * br, GstAV1FrameHeaderOBU * frame_header)
 {
-  gint i, opNum, segmentId, allFrames;
+  GstAV1ParserResult retval;
   GstAV1ReferenceFrameInfo *ref_info;
   GstAV1SequenceHeaderOBU *seq_header;
-  GstAV1ParserResult retval;
+  gint i, opNum, segmentId, allFrames;
   gint idLen = 0;
 
   GST_AV1_DEBUG_HELPER ();
@@ -2558,9 +2558,9 @@ GstAV1ParserResult
 gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstBitReader * br,
     GstAV1Size sz, GstAV1TileGroupOBU * tile_group)
 {
-  gint TileNum, endBitPos, headerBytes, startBitPos;
   GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
+  gint TileNum, endBitPos, headerBytes, startBitPos;
 
   GST_AV1_DEBUG_HELPER ();
 
