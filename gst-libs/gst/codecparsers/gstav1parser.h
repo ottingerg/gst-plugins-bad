@@ -136,6 +136,8 @@ typedef enum {
   GST_AV1_PARSER_READBITS_ERROR = 2,
   GST_AV1_PARSER_SKIPBITS_ERROR = 3,
   GST_AV1_PARSER_BITSTREAM_ERROR = 4,
+  GST_AV1_PARSER_MISSING_OBU_REFERENCE = 5,
+  GST_AV1_PARSER_MISSING_FRAMEREFINFO = 6,
 } GstAV1ParserResult;
 
 /**
@@ -414,15 +416,20 @@ typedef enum {
 /**
  * GstAV1Parser:
  *
+ * @SeenFrameHeader: is a variable used to mark whether the frame header for the current frame has been received.
+ *                   It is initialized to zero.
+ *
  */
 
 struct _GstAV1Parser {
-  GstBitReader *br;
-  GstAV1ParserResult statuscode;
+  GstAV1ReferenceFrameInfo *ref_info;
+  GstAV1SequenceHeaderOBU *seq_header;
+  GstAV1FrameHeaderOBU *frame_header;
   struct {
-    const char *last_func;
-    guint line;
-  } debuginfo;
+    guint8 SeenFrameHeader;
+    guint8 temporal_id;
+    guint8 spatial_id;
+  } state;
 };
 
 /**
@@ -1040,8 +1047,8 @@ struct _GstAV1SegmenationParams {
   guint8 segmentation_update_map;
   guint8 segmentation_temporal_update;
   guint8 segmentation_update_data;
-  guint8 FeatureEnabled[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
-  guint8 FeatureData[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
+  gint8 FeatureEnabled[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
+  gint16 FeatureData[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
   guint8 SegIdPreSkip;
   guint8 LastActiveSegId;
 };
@@ -1277,8 +1284,6 @@ struct _GstAV1FilmGrainParams {
 /**
  * _GstAV1FrameHeaderOBU:
  *
- * @SeenFrameHeader: is a variable used to mark whether the frame header for the current frame has been received.
- *                   It is initialized to zero.
  * @show_existing_frame: equal to 1, indicates the frame indexed by frame_to_show_map_idx is to be output;
  *                       show_existing_frame equal to 0 indicates that further processing is required.
  *                       If obu_type is equal to OBU_FRAME, it is a requirement of bitstream conformance
@@ -1416,7 +1421,6 @@ struct _GstAV1FilmGrainParams {
  */
 
 struct _GstAV1FrameHeaderOBU {
-  guint8 SeenFrameHeader;
   guint8 show_existing_frame;
   guint8 frame_to_show_map_idx;
   guint32 frame_presentation_time;
@@ -1609,7 +1613,34 @@ GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
 
 GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br, GstAV1OBUHeader * obu_header);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1SequenceHeaderOBU * seq_header);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameHeaderOBU * frame_header);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_metadata_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1MetadataOBU * metadata);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1TileListOBU * tile_list);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1Size sz, GstAV1TileGroupOBU * tile_group);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameHeaderOBU * frame_header);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1Size sz, GstAV1TileGroupOBU * tile_group, GstAV1FrameHeaderOBU * frame_header);
+
+
+GST_CODEC_PARSERS_API
 void               gst_av1_parser_free (GstAV1Parser * parser);
+
+
 
 G_END_DECLS
 
