@@ -363,7 +363,6 @@ static GstAV1ParserResult
 gst_av1_parse_color_config (GstAV1Parser * parser, GstBitReader * br,
     GstAV1ColorConfig * color_config)
 {
-  GstAV1ParserResult retval;
   GstAV1SequenceHeaderOBU *seq_header;
 
   GST_AV1_DEBUG_HELPER ();
@@ -424,7 +423,6 @@ gst_av1_parse_color_config (GstAV1Parser * parser, GstBitReader * br,
     } else {
       if (color_config->BitDepth == 12) {
         color_config->subsampling_x = gst_av1_read_bit (br);
-        GstAV1ParserResult retval;
         if (color_config->subsampling_x)
           color_config->subsampling_y = gst_av1_read_bit (br);
         else
@@ -468,8 +466,6 @@ static GstAV1ParserResult
 gst_av1_parse_decoder_model_info (GstAV1Parser * parser, GstBitReader * br,
     GstAV1DecoderModelInfo * decoder_model_info)
 {
-  GstAV1ParserResult retval;
-
   GST_AV1_DEBUG_HELPER ();
 
   decoder_model_info->bitrate_scale = gst_av1_read_bits (br, 4);
@@ -586,11 +582,10 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
       }
 
       if (seq_header->initial_display_delay_present_flag) {
-        seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op =
-            gst_av1_read_bit (br);
-        if (seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op)
+        seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op = gst_av1_read_bit (br);
+        if (seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op)
           seq_header->operating_points[i].initial_display_delay_minus_1 =
               gst_av1_read_bits (br, 4);
       }
@@ -983,13 +978,6 @@ gst_av1_parse_frame_size_with_refs (GstAV1Parser * parser, GstBitReader * br,
   gint i;
   GstAV1ParserResult retval;
   GstAV1ReferenceFrameInfo *ref_info;
-  GstAV1SequenceHeaderOBU *seq_header;
-
-  if (!parser->seq_header) {
-    GST_LOG ("Missing OBU Reference: seq_header");
-    return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
-  }
-  seq_header = parser->seq_header;
 
   ref_info = &(parser->ref_info);
 
@@ -1107,6 +1095,7 @@ gst_av1_parse_segmentation_params (GstAV1Parser * parser, GstBitReader * br,
       { 255, GST_AV1_MAX_LOOP_FILTER, GST_AV1_MAX_LOOP_FILTER,
     GST_AV1_MAX_LOOP_FILTER, GST_AV1_MAX_LOOP_FILTER, 7, 0, 0
   };
+  gint clipped_value, feature_value;
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -1136,8 +1125,8 @@ gst_av1_parse_segmentation_params (GstAV1Parser * parser, GstBitReader * br,
       for (i = 0; i < GST_AV1_MAX_SEGMENTS; i++) {
         for (j = 0; j < GST_AV1_SEG_LVL_MAX; j++) {
           seg_params->FeatureEnabled[i][j] = gst_av1_read_bit (br);
-          gint clipped_value = 0;
-          gint feature_value = 0;
+          clipped_value = 0;
+          feature_value = 0;
           if (seg_params->FeatureEnabled[i][j]) {
             gint bitsToRead = Segmentation_Feature_Bits[j];
             gint limit = Segmentation_Feature_Max[j];
@@ -2120,8 +2109,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
           && !seq_header->timing_info.equal_picture_interval)
         frame_header->frame_presentation_time =
             gst_av1_read_bits (br,
-            seq_header->
-            decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+            seq_header->decoder_model_info.
+            frame_presentation_time_length_minus_1 + 1);
       frame_header->refresh_frame_flags = 0;
       if (seq_header->frame_id_numbers_present_flag) {
         frame_header->display_frame_id = gst_av1_read_bits (br, idLen);
@@ -2148,8 +2137,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
         && !seq_header->timing_info.equal_picture_interval)
       frame_header->frame_presentation_time =
           gst_av1_read_bits (br,
-          seq_header->
-          decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+          seq_header->decoder_model_info.
+          frame_presentation_time_length_minus_1 + 1);
 
     if (frame_header->show_frame)
       frame_header->showable_frame = 0;
@@ -2228,16 +2217,16 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     if (frame_header->buffer_removal_time_present_flag) {
       for (opNum = 0; opNum <= seq_header->operating_points_cnt_minus_1;
           opNum++) {
-        if (seq_header->
-            operating_points[opNum].decoder_model_present_for_this_op) {
+        if (seq_header->operating_points[opNum].
+            decoder_model_present_for_this_op) {
           gint opPtIdc = seq_header->operating_points[opNum].idc;
           gint inTemporalLayer = (opPtIdc >> parser->state.temporal_id) & 1;
           gint inSpatialLayer = (opPtIdc >> (parser->state.spatial_id + 8)) & 1;
           if (opPtIdc == 0 || (inTemporalLayer && inSpatialLayer))
             frame_header->buffer_removal_time[opNum] =
                 gst_av1_read_bits (br,
-                seq_header->
-                decoder_model_info.buffer_removal_time_length_minus_1 + 1);
+                seq_header->decoder_model_info.
+                buffer_removal_time_length_minus_1 + 1);
         }
       }
     }
