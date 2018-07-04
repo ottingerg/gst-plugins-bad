@@ -104,7 +104,7 @@ typedef struct _GstAV1MetadataOBU GstAV1MetadataOBU;
 typedef struct _GstAV1FrameHeaderOBU GstAV1FrameHeaderOBU;
 typedef struct _GstAV1TileListOBU GstAV1TileListOBU;
 typedef struct _GstAV1TileGroupOBU GstAV1TileGroupOBU;
-typeday struct _GstAV1FrameOBU GstAV1FrameOBU;
+typedef struct _GstAV1FrameOBU GstAV1FrameOBU;
 
 typedef struct _GstAV1OperatingPoint GstAV1OperatingPoint;
 typedef struct _GstAV1DecoderModelInfo GstAV1DecoderModelInfo;
@@ -413,25 +413,6 @@ typedef enum {
   GST_AV1_WARP_MODEL_AFFINE = 3,
 } GstAV1WarpModelType;
 
-/**
- * GstAV1Parser:
- *
- * @SeenFrameHeader: is a variable used to mark whether the frame header for the current frame has been received.
- *                   It is initialized to zero.
- *
- */
-
-struct _GstAV1Parser {
-  GstAV1ReferenceFrameInfo ref_info;
-  struct {
-    guint8 SeenFrameHeader;
-    guint8 temporal_id;
-    guint8 spatial_id;
-  } state;
-  //References
-  GstAV1SequenceHeaderOBU *seq_header;
-  GstAV1FrameHeaderOBU *frame_header;
-};
 
 /**
  * _GstAV1OBUHeader:
@@ -1618,6 +1599,28 @@ struct _GstAV1FrameOBU {
   GstAV1TileGroupOBU tile_group;
   GstAV1FrameHeaderOBU frame_header;
 };
+
+/**
+ * GstAV1Parser:
+ *
+ * @SeenFrameHeader: is a variable used to mark whether the frame header for the current frame has been received.
+ *                   It is initialized to zero.
+ *
+ */
+
+struct _GstAV1Parser {
+  struct {
+    guint8 SeenFrameHeader;
+    guint8 temporal_id;
+    guint8 spatial_id;
+  } state;
+
+  GstAV1ReferenceFrameInfo ref_info;
+    //References
+  GstAV1SequenceHeaderOBU *seq_header;
+  GstAV1FrameHeaderOBU *frame_header;
+};
+
 
 GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
