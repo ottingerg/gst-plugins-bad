@@ -1466,9 +1466,9 @@ struct _GstAV1FrameHeaderOBU {
   guint8 reference_select;
   GstAV1GlobalMotionParams global_motion_params;
   GstAV1FilmGrainParams film_grain_params;
-  guint32 expectedFrameId[GST_AV1_REFS_PER_FRAME];
-  guint32 OrderHints[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
-  guint32 RefFrameSignBias[GST_AV1_REFS_PER_FRAME]; // is guint32 appropiat?
+  guint32 expectedFrameId[GST_AV1_NUM_REF_FRAMES];
+  guint32 OrderHints[GST_AV1_NUM_REF_FRAMES]; // is guint32 appropiat?
+  guint32 RefFrameSignBias[GST_AV1_NUM_REF_FRAMES]; // is guint32 appropiat?
   guint8 CodedLossless;
   guint8 AllLossless;
   guint8 LosslessArray[GST_AV1_MAX_SEGMENTS];
