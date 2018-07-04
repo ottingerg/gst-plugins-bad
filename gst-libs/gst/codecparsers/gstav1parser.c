@@ -522,6 +522,7 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
   GST_AV1_DEBUG_HELPER ();
 
   bzero (seq_header, sizeof (GstAV1SequenceHeaderOBU));
+  parser->seq_header = NULL;
 
   seq_header->seq_profile = gst_av1_read_bits (br, 3);
   seq_header->still_picture = gst_av1_read_bit (br);
@@ -673,12 +674,14 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
 
   gst_av1_bit_reader_skip_to_byte (br);
 
+  //reconsider if setting references this way is good
+  parser->seq_header = seq_header;
+
   return GST_AV1_PARSER_OK;
 }
 
 GstAV1ParserResult
-gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1FrameHeaderOBU * frame_header)
+gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstBitReader * br)
 {
   GST_AV1_DEBUG_HELPER ();
 
@@ -978,11 +981,7 @@ gst_av1_parse_frame_size_with_refs (GstAV1Parser * parser, GstBitReader * br,
   }
   seq_header = parser->seq_header;
 
-  if (!parser->ref_info) {
-    GST_LOG ("Missing Frame Reference Info");
-    return GST_AV1_PARSER_MISSING_FRAMEREFINFO;
-  }
-  ref_info = parser->ref_info;
+  ref_info = &(parser->ref_info);
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -1616,11 +1615,7 @@ gst_av1_parse_skip_mode_params (GstAV1Parser * parser, GstBitReader * br,
   }
   seq_header = parser->seq_header;
 
-  if (!parser->ref_info) {
-    GST_LOG ("Missing Frame Reference Info");
-    return GST_AV1_PARSER_MISSING_FRAMEREFINFO;
-  }
-  ref_info = parser->ref_info;
+  ref_info = &(parser->ref_info);
 
   gint skipModeAllowed = 0;
 
@@ -2035,11 +2030,7 @@ gst_av1_mark_ref_frames (GstAV1Parser * parser, GstBitReader * br, gint idLen)
   }
   frame_header = parser->frame_header;
 
-  if (!parser->ref_info) {
-    GST_LOG ("Missing Frame Reference Info");
-    return GST_AV1_PARSER_MISSING_FRAMEREFINFO;
-  }
-  ref_info = parser->ref_info;
+  ref_info = &(parser->ref_info);
 
 
   gint diffLen = seq_header->delta_frame_id_length_minus_2 + 2;
@@ -2087,14 +2078,10 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
   }
   seq_header = parser->seq_header;
 
-  if (!parser->ref_info) {
-    GST_LOG ("Missing Frame Reference Info");
-    return GST_AV1_PARSER_MISSING_FRAMEREFINFO;
-  }
-  ref_info = parser->ref_info;
-
+  ref_info = &(parser->ref_info);
 
   bzero (frame_header, sizeof (GstAV1FrameHeaderOBU));
+  parser->frame_header = NULL;
 
   if (seq_header->frame_id_numbers_present_flag)
     idLen =
@@ -2473,7 +2460,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
 
 
-
+  //reconsider if setting references this way is good
+  parser->frame_header = frame_header;
   return GST_AV1_PARSER_OK;
 
 }
@@ -2492,11 +2480,7 @@ gst_av1_reference_frame_update (GstAV1Parser * parser)
   }
   frame_header = parser->frame_header;
 
-  if (!parser->ref_info) {
-    GST_LOG ("Missing Frame Reference Info");
-    return GST_AV1_PARSER_MISSING_FRAMEREFINFO;
-  }
-  ref_info = parser->ref_info;
+  ref_info = &(parser->ref_info);
 
 
   if (frame_header->frame_type == GST_AV1_INTRA_ONLY_FRAME
@@ -2661,11 +2645,7 @@ gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstBitReader * br,
   }
   seq_header = parser->seq_header;
 
-  if (!parser->ref_info) {
-    GST_LOG ("Missing Frame Reference Info");
-    return GST_AV1_PARSER_MISSING_FRAMEREFINFO;
-  }
-  ref_info = parser->ref_info;
+  ref_info = &(parser->ref_info);
 
   if (parser->state.SeenFrameHeader == 1) {
     //frame_header holds vaild data
@@ -2693,8 +2673,7 @@ gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstBitReader * br,
 
 GstAV1ParserResult
 gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1Size sz, GstAV1TileGroupOBU * tile_group,
-    GstAV1FrameHeaderOBU * frame_header)
+    GstAV1FrameOBU * frame)
 {
   GstAV1ReferenceFrameInfo *ref_info;
   GstAV1SequenceHeaderOBU *seq_header;
@@ -2708,11 +2687,7 @@ gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br,
   }
   seq_header = parser->seq_header;
 
-  if (!parser->ref_info) {
-    GST_LOG ("Missing Frame Reference Info");
-    return GST_AV1_PARSER_MISSING_FRAMEREFINFO;
-  }
-  ref_info = parser->ref_info;
+  ref_info = &(parser->ref_info);
 
   int startBitPos = gst_av1_bit_reader_get_pos (br);
   retval = gst_av1_parse_frame_header_obu (parser, br, frame_header);

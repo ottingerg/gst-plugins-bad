@@ -104,6 +104,7 @@ typedef struct _GstAV1MetadataOBU GstAV1MetadataOBU;
 typedef struct _GstAV1FrameHeaderOBU GstAV1FrameHeaderOBU;
 typedef struct _GstAV1TileListOBU GstAV1TileListOBU;
 typedef struct _GstAV1TileGroupOBU GstAV1TileGroupOBU;
+typeday struct _GstAV1FrameOBU GstAV1FrameOBU;
 
 typedef struct _GstAV1OperatingPoint GstAV1OperatingPoint;
 typedef struct _GstAV1DecoderModelInfo GstAV1DecoderModelInfo;
@@ -137,7 +138,6 @@ typedef enum {
   GST_AV1_PARSER_SKIPBITS_ERROR = 3,
   GST_AV1_PARSER_BITSTREAM_ERROR = 4,
   GST_AV1_PARSER_MISSING_OBU_REFERENCE = 5,
-  GST_AV1_PARSER_MISSING_FRAMEREFINFO = 6,
 } GstAV1ParserResult;
 
 /**
@@ -422,14 +422,15 @@ typedef enum {
  */
 
 struct _GstAV1Parser {
-  GstAV1ReferenceFrameInfo *ref_info;
-  GstAV1SequenceHeaderOBU *seq_header;
-  GstAV1FrameHeaderOBU *frame_header;
+  GstAV1ReferenceFrameInfo ref_info;
   struct {
     guint8 SeenFrameHeader;
     guint8 temporal_id;
     guint8 spatial_id;
   } state;
+  //References
+  GstAV1SequenceHeaderOBU *seq_header;
+  GstAV1FrameHeaderOBU *frame_header;
 };
 
 /**
@@ -1608,6 +1609,15 @@ struct _GstAV1TileGroupOBU {
   } entry[GST_AV1_MAX_TILE_COUNT];
 };
 
+/**
+ * _GstAV1FrameOBU:
+ *
+ */
+struct _GstAV1FrameOBU {
+  GstAV1Size sz;
+  GstAV1TileGroupOBU tile_group;
+  GstAV1FrameHeaderOBU frame_header;
+};
 
 GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
@@ -1619,7 +1629,7 @@ GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1SequenceHeaderOBU * seq_header);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameHeaderOBU * frame_header);
+GstAV1ParserResult gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstBitReader * br);
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_metadata_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1MetadataOBU * metadata);
@@ -1634,7 +1644,7 @@ GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameHeaderOBU * frame_header);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1Size sz, GstAV1TileGroupOBU * tile_group, GstAV1FrameHeaderOBU * frame_header);
+GstAV1ParserResult gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameOBU * frame);
 
 
 GST_CODEC_PARSERS_API

@@ -66,7 +66,9 @@ base_tests = [
   [['libs/player.c'], not enable_gst_player_tests, [gstplayer_dep]],
   [['libs/vc1parser.c'], false, [gstcodecparsers_dep]],
   [['libs/vp8parser.c'], false, [gstcodecparsers_dep]],
+  [['libs/av1parser.c'], false, [gstcodecparsers_dep]],
 ]
+
 
 test_defines = [
   '-UG_DISABLE_ASSERT',

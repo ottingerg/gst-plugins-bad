@@ -99,7 +99,7 @@ static GstStaticPadTemplate gst_av1_enc_src_pad_template =
 GST_STATIC_PAD_TEMPLATE ("src",
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS ("video/x-av1")
+    GST_STATIC_CAPS ("video/x-av1, " "profile = (string) {0, 1, 2, 3}")
     );
 
 static void
@@ -261,12 +261,20 @@ gst_av1_enc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   GstVideoCodecState *output_state;
   GstAV1Enc *av1enc = GST_AV1_ENC_CAST (encoder);
   GstAV1EncClass *av1enc_class = GST_AV1_ENC_GET_CLASS (av1enc);
+  GstCaps *caps;
+
+
+  caps =
+      gst_caps_new_simple ("video/x-av1", "profile", G_TYPE_STRING, "1", NULL);
 
   output_state =
       gst_video_encoder_set_output_state (encoder,
       gst_pad_get_pad_template_caps (GST_VIDEO_ENCODER_SRC_PAD (encoder)),
       state);
   gst_video_codec_state_unref (output_state);
+
+  gst_caps_unref (caps);
+
 
   if (av1enc->input_state) {
     gst_video_codec_state_unref (av1enc->input_state);
