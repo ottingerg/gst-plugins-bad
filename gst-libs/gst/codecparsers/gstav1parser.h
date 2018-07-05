@@ -1613,6 +1613,10 @@ struct _GstAV1Parser {
     guint8 SeenFrameHeader;
     guint8 temporal_id;
     guint8 spatial_id;
+    gint64 last_position;
+    gint64 current_position;
+    GstAV1Size last_obu_size;
+    guint8 last_obu_had_size_filed;
   } state;
 
   GstAV1ReferenceFrameInfo ref_info;
@@ -1626,7 +1630,7 @@ GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br, GstAV1OBUHeader * obu_header);
+GstAV1ParserResult gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br, GstAV1OBUHeader * obu_header, GstAV1Size annexb_sz);
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1SequenceHeaderOBU * seq_header);

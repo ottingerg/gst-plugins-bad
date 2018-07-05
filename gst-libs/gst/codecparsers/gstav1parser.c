@@ -321,13 +321,26 @@ gst_av1_bitstreamfn_delta_q (GstBitReader * br, GstAV1ParserResult * retval)
 
 GstAV1ParserResult
 gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1OBUHeader * obu_header)
+    GstAV1OBUHeader * obu_header, GstAV1Size annexb_sz)
 {
   GstAV1ParserResult retval;
+  GstAV1Size skip_trailing_bits;
 
   GST_AV1_DEBUG_HELPER ();
 
   bzero (obu_header, sizeof (GstAV1OBUHeader));
+
+  parser->state.last_position = parser->state.current_position;
+  parser->state.current_position = gst_av1_bit_reader_get_pos (br);
+
+  if (parser->state.last_obu_size) {
+    skip_trailing_bits =
+        (parser->state.last_obu_size * 8) -
+        (GstAV1Size) (parser->state.current_position -
+        parser->state.last_position -
+        parser->state.last_obu_had_size_filed * 8 - 8);
+    gst_av1_bit_reader_skip (br, skip_trailing_bits);
+  }
 
   obu_header->obu_forbidden_bit = gst_av1_read_bit (br);
 
@@ -354,7 +367,13 @@ gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
   if (obu_header->obu_has_size_field) {
     obu_header->obu_size = gst_av1_bitstreamfn_leb128 (br, &retval);
     GST_AV1_EVAL_RETVAL_LOGGED (retval);
+    parser->state.last_obu_had_size_filed = 1;
+  } else {
+    obu_header->obu_size = annexb_sz;
+    parser->state.last_obu_had_size_filed = 0;
   }
+
+  parser->state.last_obu_size = obu_header->obu_size;
 
   return GST_AV1_PARSER_OK;
 }
@@ -522,7 +541,7 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
   GST_AV1_DEBUG_HELPER ();
 
   bzero (seq_header, sizeof (GstAV1SequenceHeaderOBU));
-  parser->seq_header = NULL;
+  parser->seq_header = seq_header;
 
   seq_header->seq_profile = gst_av1_read_bits (br, 3);
   seq_header->still_picture = gst_av1_read_bit (br);
@@ -582,11 +601,10 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
       }
 
       if (seq_header->initial_display_delay_present_flag) {
-        seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op =
-            gst_av1_read_bit (br);
-        if (seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op)
+        seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op = gst_av1_read_bit (br);
+        if (seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op)
           seq_header->operating_points[i].initial_display_delay_minus_1 =
               gst_av1_read_bits (br, 4);
       }
@@ -674,9 +692,6 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
   seq_header->film_grain_params_present = gst_av1_read_bit (br);
 
   gst_av1_bit_reader_skip_to_byte (br);
-
-  //reconsider if setting references this way is good
-  parser->seq_header = seq_header;
 
   return GST_AV1_PARSER_OK;
 }
@@ -2104,7 +2119,7 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
   ref_info = &(parser->ref_info);
 
   bzero (frame_header, sizeof (GstAV1FrameHeaderOBU));
-  parser->frame_header = NULL;
+  parser->frame_header = frame_header;
 
   if (seq_header->frame_id_numbers_present_flag)
     idLen =
@@ -2127,8 +2142,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
           && !seq_header->timing_info.equal_picture_interval)
         frame_header->frame_presentation_time =
             gst_av1_read_bits (br,
-            seq_header->
-            decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+            seq_header->decoder_model_info.
+            frame_presentation_time_length_minus_1 + 1);
       frame_header->refresh_frame_flags = 0;
       if (seq_header->frame_id_numbers_present_flag) {
         frame_header->display_frame_id = gst_av1_read_bits (br, idLen);
@@ -2155,8 +2170,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
         && !seq_header->timing_info.equal_picture_interval)
       frame_header->frame_presentation_time =
           gst_av1_read_bits (br,
-          seq_header->
-          decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+          seq_header->decoder_model_info.
+          frame_presentation_time_length_minus_1 + 1);
 
     if (frame_header->show_frame)
       frame_header->showable_frame = 0;
@@ -2235,16 +2250,16 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     if (frame_header->buffer_removal_time_present_flag) {
       for (opNum = 0; opNum <= seq_header->operating_points_cnt_minus_1;
           opNum++) {
-        if (seq_header->
-            operating_points[opNum].decoder_model_present_for_this_op) {
+        if (seq_header->operating_points[opNum].
+            decoder_model_present_for_this_op) {
           gint opPtIdc = seq_header->operating_points[opNum].idc;
           gint inTemporalLayer = (opPtIdc >> parser->state.temporal_id) & 1;
           gint inSpatialLayer = (opPtIdc >> (parser->state.spatial_id + 8)) & 1;
           if (opPtIdc == 0 || (inTemporalLayer && inSpatialLayer))
             frame_header->buffer_removal_time[opNum] =
                 gst_av1_read_bits (br,
-                seq_header->
-                decoder_model_info.buffer_removal_time_length_minus_1 + 1);
+                seq_header->decoder_model_info.
+                buffer_removal_time_length_minus_1 + 1);
         }
       }
     }
@@ -2482,9 +2497,6 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
       &(frame_header->film_grain_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
 
-
-  //reconsider if setting references this way is good
-  parser->frame_header = frame_header;
   return GST_AV1_PARSER_OK;
 
 }
