@@ -1116,7 +1116,6 @@ struct _GstAV1CDEFParams {
 /**
  * _GstAV1LoopRestorationParams:
  *
- * @lr_type: specifies the type of restoration for each plane
  * @lr_unit_shift: specifies if the luma restoration size should be halved.
  * @lr_unit_extra_shift: specifies if the luma restoration size should be halved again.
  * @lr_uv_shift: is only present for 4:2:0 formats and specifies if the chroma size should be half the luma size.
@@ -1128,7 +1127,6 @@ struct _GstAV1CDEFParams {
  */
 
 struct _GstAV1LoopRestorationParams {
-  guint8 lr_type;
   guint8 lr_unit_shift;
   guint8 lr_unit_extra_shift;
   guint8 lr_uv_shift;
@@ -1491,8 +1489,13 @@ struct _GstAV1FrameHeaderOBU {
  * @RefRenderWidth:
  * @RefFrameType:
  * @RefOrderHint:
+ * @RefMiCols;
+ * @RefMiRows;
+ * @RefBitDepth;
+ * @RefSubsamplingX;
+ * @RefSubsamplingY;
  *
- * Note: The Reference Info is only partly implemented - check section 7.20 of Spec
+ * Note: The Reference Info is only partly implemented - check chapter 7.20 and 7.21 of Spec
  */
 
 struct _GstAV1ReferenceFrameInfo {
@@ -1504,8 +1507,13 @@ struct _GstAV1ReferenceFrameInfo {
     guint32 RefFrameWidth;
     guint32 RefRenderHeight;
     guint32 RefRenderWidth;
-    guint32 RefFrameType;
+    GstAV1FrameType RefFrameType;
     guint32 RefOrderHint; // is guint32 appropiat?
+    guint32 RefMiCols;
+    guint32 RefMiRows;
+    guint8 RefBitDepth;
+    guint8 RefSubsamplingX;
+    guint8 RefSubsamplingY;
   } entry[GST_AV1_REFS_PER_FRAME];
 };
 
@@ -1595,7 +1603,6 @@ struct _GstAV1TileGroupOBU {
  *
  */
 struct _GstAV1FrameOBU {
-  GstAV1Size sz;
   GstAV1TileGroupOBU tile_group;
   GstAV1FrameHeaderOBU frame_header;
 };
@@ -1613,10 +1620,9 @@ struct _GstAV1Parser {
     guint8 SeenFrameHeader;
     guint8 temporal_id;
     guint8 spatial_id;
-    gint64 last_position;
-    gint64 current_position;
-    GstAV1Size last_obu_size;
-    guint8 last_obu_had_size_filed;
+    guint64 obu_start_position;
+    GstAV1Size obu_size;
+    GstAV1OBUType obu_type;
   } state;
 
   GstAV1ReferenceFrameInfo ref_info;
