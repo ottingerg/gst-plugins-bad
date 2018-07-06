@@ -7,7 +7,8 @@ libgstcodecparsers_@GST_API_VERSION@_la_SOURCES = \
 	gstjpegparser.c \
 	gstmpegvideometa.c \
 	gstjpeg2000sampling.c \
-	gstvp9parser.c vp9utils.c
+	gstvp9parser.c vp9utils.c \
+	gstav1parser.c
 
 libgstcodecparsers_@GST_API_VERSION@includedir = \
 	$(includedir)/gstreamer-@GST_API_VERSION@/gst/codecparsers
@@ -21,7 +22,8 @@ libgstcodecparsers_@GST_API_VERSION@include_HEADERS = \
 	gstjpegparser.h \
 	gstmpegvideometa.h \
 	gstjpeg2000sampling.h \
-	gstvp9parser.h
+	gstvp9parser.h \
+	gstav1parser.h
 
 libgstcodecparsers_@GST_API_VERSION@_la_CFLAGS = \
 	$(GST_PLUGINS_BAD_CFLAGS) \

@@ -284,6 +284,7 @@ check_PROGRAMS = \
 	libs/h264parser \
 	libs/h265parser \
 	libs/vp8parser \
+	libs/av1parser \
 	$(check_uvch264) \
 	libs/vc1parser \
 	$(check_x265enc) \
@@ -393,6 +394,15 @@ libs_vp8parser_CFLAGS = \
 	$(GST_BASE_CFLAGS) $(GST_CFLAGS) $(AM_CFLAGS)
 
 libs_vp8parser_LDADD = \
+	$(top_builddir)/gst-libs/gst/codecparsers/libgstcodecparsers-@GST_API_VERSION@.la \
+	$(GST_BASE_LIBS) $(GST_LIBS) $(LDADD)
+
+libs_av1parser_CFLAGS = \
+	$(GST_PLUGINS_BAD_CFLAGS) $(GST_PLUGINS_BASE_CFLAGS) \
+	-DGST_USE_UNSTABLE_API \
+	$(GST_BASE_CFLAGS) $(GST_CFLAGS) $(AM_CFLAGS)
+
+libs_av1parser_LDADD = \
 	$(top_builddir)/gst-libs/gst/codecparsers/libgstcodecparsers-@GST_API_VERSION@.la \
 	$(GST_BASE_LIBS) $(GST_LIBS) $(LDADD)
 
@@ -584,4 +594,3 @@ elements_msdk_SOURCES = elements/msdkh264enc.c
 
 distclean-local-orc:
 	rm -rf orc
-
