@@ -47,16 +47,13 @@ static const guint8 aom_testdata_av1_1_b8_01_size_16x16[] = {
   0xf8, 0xfc, 0xc9, 0x7d, 0x9d, 0x4a, 0x61, 0x16, 0xb1, 0x65
 };
 
-//GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
-int
-main (void)
+GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
 {
   GstAV1Parser *parser;
   GstBitReader *br;
   GstAV1OBUHeader obu_header;
   GstAV1SequenceHeaderOBU seq_header;
   GstAV1FrameOBU frame;
-  volatile gint bitpos;
 
 
   bzero (&obu_header, sizeof (obu_header));
@@ -69,61 +66,85 @@ main (void)
 
   //1st OBU should be OBU_TEMPORAL_DELIMITER
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-
-//  assert_equals_int(obu_header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
+  assert_equals_int (obu_header.obu_forbidden_bit, 0);
+  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
+  assert_equals_int (obu_header.obu_extention_flag, 0);
+  assert_equals_int (obu_header.obu_has_size_field, 1);
+  assert_equals_int (obu_header.obu_reserved_1bit, 0);
+  assert_equals_int (obu_header.obu_size, 0);
 
   gst_av1_parse_temporal_delimiter_obu (parser, br);
-
-  bitpos = gst_bit_reader_get_pos (br);
 
 
   //2nd OBU should be OBU_SEQUENCE_HEADER
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-
-  //assert_equals_int(obu_header.obu_type, GST_AV1_OBU_SEQUENCE_HEADER);
+  assert_equals_int (obu_header.obu_forbidden_bit, 0);
+  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_SEQUENCE_HEADER);
+  assert_equals_int (obu_header.obu_extention_flag, 0);
+  assert_equals_int (obu_header.obu_has_size_field, 1);
+  assert_equals_int (obu_header.obu_reserved_1bit, 0);
+  assert_equals_int (obu_header.obu_size, 10);
 
   gst_av1_parse_sequence_header_obu (parser, br, &seq_header);
-
-  bitpos = gst_bit_reader_get_pos (br);
+  assert_equals_int (seq_header.seq_profile, 0);
+  assert_equals_int (seq_header.still_picture, 0);
+  assert_equals_int (seq_header.reduced_still_picture_header, 0);
+  assert_equals_int (seq_header.timing_info_present_flag, 0);
+  assert_equals_int (seq_header.initial_display_delay_present_flag, 0);
+  assert_equals_int (seq_header.operating_points_cnt_minus_1, 0);
+  assert_equals_int (seq_header.operating_points[0].idc, 0);
+  assert_equals_int (seq_header.operating_points[0].seq_level_idx, 0);
+  assert_equals_int (seq_header.frame_width_bits_minus_1, 3);
+  assert_equals_int (seq_header.frame_height_bits_minus_1, 3);
+  assert_equals_int (seq_header.max_frame_width_minus_1, 15);
+  assert_equals_int (seq_header.max_frame_height_minus_1, 15);
+  assert_equals_int (seq_header.frame_id_numbers_present_flag, 0);
+  assert_equals_int (seq_header.use_128x128_superblock, 1);
+  assert_equals_int (seq_header.enable_filter_intra, 1);
+  assert_equals_int (seq_header.enable_intra_edge_filter, 1);
 
 
   //3rd OBU should be GST_AV1_OBU_FRAME
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-
-  bitpos = gst_bit_reader_get_pos (br);
-
-  //assert_equals_int(obu_header.obu_type, GST_AV1_OBU_FRAME);
+  assert_equals_int (obu_header.obu_forbidden_bit, 0);
+  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_FRAME);
+  assert_equals_int (obu_header.obu_extention_flag, 0);
+  assert_equals_int (obu_header.obu_has_size_field, 1);
+  assert_equals_int (obu_header.obu_reserved_1bit, 0);
+  assert_equals_int (obu_header.obu_size, 166);
 
   gst_av1_parse_frame_obu (parser, br, &frame);
 
-  bitpos = gst_bit_reader_get_pos (br);
-
   //4th OBU should be OBU_TEMPORAL_DELIMITER
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-
-  //assert_equals_int(obu_header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
+  assert_equals_int (obu_header.obu_forbidden_bit, 0);
+  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
+  assert_equals_int (obu_header.obu_extention_flag, 0);
+  assert_equals_int (obu_header.obu_has_size_field, 1);
+  assert_equals_int (obu_header.obu_reserved_1bit, 0);
+  assert_equals_int (obu_header.obu_size, 0);
 
   gst_av1_parse_temporal_delimiter_obu (parser, br);
-
-  bitpos = gst_bit_reader_get_pos (br);
 
 
   //5th OBU should be GST_AV1_OBU_FRAME
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-
-  //assert_equals_int(obu_header.obu_type, GST_AV1_OBU_FRAME);
+  assert_equals_int (obu_header.obu_forbidden_bit, 0);
+  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_FRAME);
+  assert_equals_int (obu_header.obu_extention_flag, 0);
+  assert_equals_int (obu_header.obu_has_size_field, 1);
+  assert_equals_int (obu_header.obu_reserved_1bit, 0);
+  assert_equals_int (obu_header.obu_size, 75);
 
   gst_av1_parse_frame_obu (parser, br, &frame);
 
-  bitpos = gst_bit_reader_get_pos (br);
 
   gst_bit_reader_free (br);
   gst_av1_parser_free (parser);
 
-  return bitpos - bitpos;
 }
 
-/*
+
 GST_END_TEST;
 
 static Suite *
@@ -140,4 +161,3 @@ av1parsers_suite (void)
 }
 
 GST_CHECK_MAIN (av1parsers);
-*/

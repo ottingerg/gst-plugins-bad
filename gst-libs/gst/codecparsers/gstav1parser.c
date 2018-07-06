@@ -626,11 +626,10 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
       }
 
       if (seq_header->initial_display_delay_present_flag) {
-        seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op =
-            gst_av1_read_bit (br);
-        if (seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op)
+        seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op = gst_av1_read_bit (br);
+        if (seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op)
           seq_header->operating_points[i].initial_display_delay_minus_1 =
               gst_av1_read_bits (br, 4);
       }
@@ -2165,8 +2164,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
           && !seq_header->timing_info.equal_picture_interval)
         frame_header->frame_presentation_time =
             gst_av1_read_bits (br,
-            seq_header->
-            decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+            seq_header->decoder_model_info.
+            frame_presentation_time_length_minus_1 + 1);
       frame_header->refresh_frame_flags = 0;
       if (seq_header->frame_id_numbers_present_flag) {
         frame_header->display_frame_id = gst_av1_read_bits (br, idLen);
@@ -2193,8 +2192,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
         && !seq_header->timing_info.equal_picture_interval)
       frame_header->frame_presentation_time =
           gst_av1_read_bits (br,
-          seq_header->
-          decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+          seq_header->decoder_model_info.
+          frame_presentation_time_length_minus_1 + 1);
 
     if (frame_header->show_frame)
       frame_header->showable_frame = 0;
@@ -2210,7 +2209,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
   }
 
   if (frame_header->frame_type == GST_AV1_KEY_FRAME && frame_header->show_frame) {
-    for (i = 0; i < GST_AV1_NUM_REF_FRAMES; i++) {
+    //HACK-Warning: we are deviating form Spec because GST_AV1_NUM_REF_FRAMES is out of bound added -1
+    for (i = 0; i < GST_AV1_NUM_REF_FRAMES - 1; i++) {
       ref_info->entry[i].RefValid = 0;
       ref_info->entry[i].RefOrderHint = 0;
     }
@@ -2273,16 +2273,16 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     if (frame_header->buffer_removal_time_present_flag) {
       for (opNum = 0; opNum <= seq_header->operating_points_cnt_minus_1;
           opNum++) {
-        if (seq_header->
-            operating_points[opNum].decoder_model_present_for_this_op) {
+        if (seq_header->operating_points[opNum].
+            decoder_model_present_for_this_op) {
           gint opPtIdc = seq_header->operating_points[opNum].idc;
           gint inTemporalLayer = (opPtIdc >> parser->state.temporal_id) & 1;
           gint inSpatialLayer = (opPtIdc >> (parser->state.spatial_id + 8)) & 1;
           if (opPtIdc == 0 || (inTemporalLayer && inSpatialLayer))
             frame_header->buffer_removal_time[opNum] =
                 gst_av1_read_bits (br,
-                seq_header->
-                decoder_model_info.buffer_removal_time_length_minus_1 + 1);
+                seq_header->decoder_model_info.
+                buffer_removal_time_length_minus_1 + 1);
         }
       }
     }
@@ -2550,6 +2550,11 @@ gst_av1_load_reference_frame (GstAV1Parser * parser)
 
   ref_info = &(parser->ref_info);
 
+  if (frame_header->frame_to_show_map_idx > GST_AV1_NUM_REF_FRAMES - 1)
+    return GST_AV1_PARSER_ERROR;
+
+//TODO: Question: overwritting seq_header vars seems doggy
+//maybe better to move (or duplicate) subsampling_x, subsampling_y and bitdepth to parser
   frame_header->current_frame_id =
       ref_info->entry[frame_header->frame_to_show_map_idx].RefFrameId;
   frame_header->frame_type =
