@@ -452,18 +452,6 @@ struct _GstAV1OBUHeader {
  * @decoder_model_present_for_this_op: equal to one indicates that there is a decoder model associated
  *                                     with this operating point.decoder_model_present_for_this_op equal
  *                                     to zero indicates that there is not a decoder model associated.
- *
- * @bitrate_minus_1: together with bitrate_scale specifies the maximum smoothing buffer input bitrate
- *                   for the operating point op, in bits/s, as follows:
- *                   BitRate = ( bitrate_minus_1 + 1 ) << ( 6 + bitrate_scale )
- *                   bitrate_minus_1 shall be in the range of 0 to ( (1 << 32) - 2).
- * @buffer_size_minus_1: together with buffer_size_scale specifies the smoothing buffer size for operating
- *                       point op, in bits, as follows:
- *                       BufferSize = ( buffer_size_minus_1 + 1 ) << ( 4 + buffer_size_scale )
- *                       buffer_size_minus_1 shall be in the range of 0 to ( (1 << 32) - 2).
- * @cbr_flag: equal to 0 indicates that the decoder model associated with operating point op operates in
- *            variable bitrate (VBR) mode. cbr_flag equal to 1 indicates that the decoder model associated
- *            with operating point op operates in constant bitrate (CBR) mode.
  * @decoder_buffer_delay: specifies the time interval between the arrival of the first bit in the smoothing
  *                        buffer and the subsequent removal of the data that belongs to the first coded
  *                        frame for operating point op, measured in units of 1/90000 seconds. The length of
@@ -493,9 +481,6 @@ struct _GstAV1OperatingPoint {
   guint8 seq_tier;
   guint16 idc;
   guint8 decoder_model_present_for_this_op;
-  guint8 bitrate_minus_1;
-  guint8 buffer_size_minus_1;
-  guint8 cbr_flag;
   guint8 decoder_buffer_delay;
   guint8 encoder_buffer_delay;
   guint8 low_delay_mode_flag;
@@ -512,8 +497,6 @@ struct _GstAV1OperatingPoint {
  */
 
 struct _GstAV1DecoderModelInfo {
-  guint8 bitrate_scale;
-  guint8 buffer_size_scale;
   guint8 buffer_delay_length_minus_1;
   guint32 num_units_in_decoding_tick;
   guint8 buffer_removal_time_length_minus_1;
@@ -752,8 +735,8 @@ struct _GstAV1MetadataHdrCll {
  */
 
 struct _GstAV1MetadataHdrMdcv {
-  guint16 primary_chromaticity_x[4];
-  guint16 primary_chromaticity_y[4];
+  guint16 primary_chromaticity_x[3];
+  guint16 primary_chromaticity_y[3];
   guint16 white_point_chromaticity_x;
   guint16 white_point_chromaticity_y;
   guint32 luminance_max;

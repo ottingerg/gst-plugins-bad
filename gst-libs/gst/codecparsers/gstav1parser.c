@@ -514,8 +514,6 @@ gst_av1_parse_decoder_model_info (GstAV1Parser * parser, GstBitReader * br,
 {
   GST_AV1_DEBUG_HELPER ();
 
-  decoder_model_info->bitrate_scale = gst_av1_read_bits (br, 4);
-  decoder_model_info->buffer_size_scale = gst_av1_read_bits (br, 4);
   decoder_model_info->buffer_delay_length_minus_1 = gst_av1_read_bits (br, 5);
   decoder_model_info->num_units_in_decoding_tick = gst_av1_read_bits (br, 32);
   decoder_model_info->buffer_removal_time_length_minus_1 =
@@ -541,12 +539,6 @@ gst_av1_parse_operating_parameters_info (GstAV1Parser * parser,
   }
   seq_header = parser->seq_header;
 
-
-  op_point->bitrate_minus_1 = gst_av1_bitstreamfn_uvlc (br, &retval);
-  GST_AV1_EVAL_RETVAL_LOGGED (retval);
-  op_point->buffer_size_minus_1 = gst_av1_bitstreamfn_uvlc (br, &retval);
-  GST_AV1_EVAL_RETVAL_LOGGED (retval);
-  op_point->cbr_flag = gst_av1_read_bit (br);
   op_point->decoder_buffer_delay =
       gst_av1_read_bits (br,
       seq_header->decoder_model_info.buffer_delay_length_minus_1 + 1);
@@ -705,7 +697,7 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
     }
     if (seq_header->enable_order_hint) {
       seq_header->order_hint_bits_minus_1 = gst_av1_read_bits (br, 3);
-      /*OrderHintBits = order_hint_bits_minus_1 + 1 */
+      /*OrderHintBits = order_hint_bits_minus_1; */
     } else {
       /*OrderHintBits = 0; */
     }
@@ -770,7 +762,7 @@ gst_av1_parse_metadata_hdr_mdcv (GstAV1Parser * parser, GstBitReader * br,
 
   GST_AV1_DEBUG_HELPER ();
 
-  for (i = 0; i < 4; i++) {
+  for (i = 0; i < 3; i++) {
     hdr_mdcv->primary_chromaticity_x[i] = gst_av1_read_bits (br, 16);
     hdr_mdcv->primary_chromaticity_y[i] = gst_av1_read_bits (br, 16);
   }
@@ -789,39 +781,43 @@ gst_av1_parse_metadata_scalability (GstAV1Parser * parser, GstBitReader * br,
     GstAV1MetadataScalability * scalability)
 {
   gint i, j;
+  guint8 scalability_structure_reserved_3bits;
 
   GST_AV1_DEBUG_HELPER ();
 
   scalability->scalability_mode_idc = gst_av1_read_bits (br, 8);
-  scalability->spatial_layers_cnt_minus_1 = gst_av1_read_bits (br, 2);
-  scalability->spatial_layer_dimensions_present_flag = gst_av1_read_bit (br);
-  scalability->spatial_layer_description_present_flag = gst_av1_read_bit (br);
-  scalability->temporal_group_description_present_flag = gst_av1_read_bit (br);
-  scalability->scalability_structure_reserved_3bits = gst_av1_read_bit (br);
-  if (scalability->spatial_layer_dimensions_present_flag) {
-    for (i = 0; i <= scalability->spatial_layers_cnt_minus_1; i++) {
-      scalability->spatial_layer_max_width[i] = gst_av1_read_bits (br, 16);
-      scalability->spatial_layer_max_height[i] = gst_av1_read_bits (br, 16);
+  if (scalability->scalability_mode_idc == GST_AV1GST_AV1_SCALABILITY_SS) {
+    scalability->spatial_layers_cnt_minus_1 = gst_av1_read_bits (br, 2);
+    scalability->spatial_layer_dimensions_present_flag = gst_av1_read_bit (br);
+    scalability->spatial_layer_description_present_flag = gst_av1_read_bit (br);
+    scalability->temporal_group_description_present_flag =
+        gst_av1_read_bit (br);
+    scalability_structure_reserved_3bits = gst_av1_read_bits (br, 3);
+    if (scalability->spatial_layer_dimensions_present_flag) {
+      for (i = 0; i <= scalability->spatial_layers_cnt_minus_1; i++) {
+        scalability->spatial_layer_max_width[i] = gst_av1_read_bits (br, 16);
+        scalability->spatial_layer_max_height[i] = gst_av1_read_bits (br, 16);
+      }
     }
-  }
 
-  if (scalability->spatial_layer_description_present_flag) {
-    for (i = 0; i <= scalability->spatial_layers_cnt_minus_1; i++)
-      scalability->spatial_layer_ref_id[i] = gst_av1_read_bit (br);
-  }
+    if (scalability->spatial_layer_description_present_flag) {
+      for (i = 0; i <= scalability->spatial_layers_cnt_minus_1; i++)
+        scalability->spatial_layer_ref_id[i] = gst_av1_read_bits (br, 8);
+    }
 
-  if (scalability->temporal_group_description_present_flag) {
-    scalability->temporal_group_size = gst_av1_read_bits (br, 8);
-    for (i = 0; i < scalability->temporal_group_size; i++) {
-      scalability->temporal_group_temporal_id[i] = gst_av1_read_bits (br, 3);
-      scalability->temporal_group_temporal_switching_up_point_flag[i] =
-          gst_av1_read_bit (br);
-      scalability->temporal_group_spatial_switching_up_point_flag[i] =
-          gst_av1_read_bit (br);
-      scalability->temporal_group_ref_cnt[i] = gst_av1_read_bits (br, 3);
-      for (j = 0; j < scalability->temporal_group_ref_cnt[i]; j++) {
-        scalability->temporal_group_ref_pic_diff[i][j] =
-            gst_av1_read_bits (br, 8);
+    if (scalability->temporal_group_description_present_flag) {
+      scalability->temporal_group_size = gst_av1_read_bits (br, 8);
+      for (i = 0; i < scalability->temporal_group_size; i++) {
+        scalability->temporal_group_temporal_id[i] = gst_av1_read_bits (br, 3);
+        scalability->temporal_group_temporal_switching_up_point_flag[i] =
+            gst_av1_read_bit (br);
+        scalability->temporal_group_spatial_switching_up_point_flag[i] =
+            gst_av1_read_bit (br);
+        scalability->temporal_group_ref_cnt[i] = gst_av1_read_bits (br, 3);
+        for (j = 0; j < scalability->temporal_group_ref_cnt[i]; j++) {
+          scalability->temporal_group_ref_pic_diff[i][j] =
+              gst_av1_read_bits (br, 8);
+        }
       }
     }
   }
@@ -854,7 +850,7 @@ gst_av1_parse_metadata_timecode (GstAV1Parser * parser, GstBitReader * br,
         timecode->minutes_value = gst_av1_read_bits (br, 6);
         timecode->hours_flag = gst_av1_read_bit (br);
         if (timecode->hours_flag)
-          timecode->hours_value = gst_av1_read_bits (br, 6);
+          timecode->hours_value = gst_av1_read_bits (br, 5);
       }
     }
   }
