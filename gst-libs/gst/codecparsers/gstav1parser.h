@@ -3,21 +3,19 @@
  *
  *  Copyright (C) 2018 Georg Ottinger
  *    Author: Georg Ottinger<g.ottinger@gmx.at>
- *
- * This library is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Library General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Library General Public License for more details.
- *
- * You should have received a copy of the GNU Library General Public
- * License along with this library; if not, write to the
- * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
- * Boston, MA 02110-1301, USA.
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+
+ You should have received a copy of the GNU Lesser General Public
+ License along with this library; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*
  * Description texts for syntax elements are taken from
@@ -29,7 +27,8 @@
   * @short_description: Convenience library for parsing AV1 video bitstream.
   *
   * For more details about the structures, you can refer to the
-  * specifications: https://aomediacodec.github.io/av1-spec/av1-spec.pdf
+  * AV1 Bitstream & Decoding Process Specification V1.0.0
+  * [specification](https://aomediacodec.github.io/av1-spec/av1-spec.pdf)
   *
   */
 
@@ -51,7 +50,7 @@ G_BEGIN_DECLS
 #define GUINT32_MAX UINT32_MAX
 
 
-//TODO: Import all Defines from SPEC
+/*TODO: Import all Defines from SPEC */
 
 #define GST_AV1_MAX_OPERATING_POINTS 32
 #define GST_AV1_MAX_TILE_COUNT 512
@@ -59,9 +58,9 @@ G_BEGIN_DECLS
 #define GST_AV1_MAX_TILE_AREA (4096*2304)
 #define GST_AV1_MAX_TILE_ROWS 64
 #define GST_AV1_MAX_TILE_COLS 64
-#define GST_AV1_MAX_SPATIAL_LAYERS 2 //is this correct??
-#define GST_AV1_MAX_TEMPORAL_GROUP_SIZE 8 //is this correct??
-#define GST_AV1_MAX_TEMPORAL_GROUP_REFERENCES 8 //is this correct??
+#define GST_AV1_MAX_SPATIAL_LAYERS 2 /*is this correct?? */
+#define GST_AV1_MAX_TEMPORAL_GROUP_SIZE 8 /*is this correct?? */
+#define GST_AV1_MAX_TEMPORAL_GROUP_REFERENCES 8 /*is this correct??*/
 #define GST_AV1_TOTAL_REFS_PER_FRAME 8
 #define GST_AV1_MAX_SEGMENTS 8
 #define GST_AV1_SEG_LVL_MAX 8
@@ -385,17 +384,17 @@ typedef enum {
  * GstAV1ReferenceFrame:
  *
  */
- // TODO: Reference Numbers need to checked
+ /* TODO: Reference Numbers need to checked */
 
 typedef enum {
-  GST_AV1_REF_INTRA_FRAME,
-  GST_AV1_REF_LAST_FRAME,
-  GST_AV1_REF_LAST2_FRAME,
-  GST_AV1_REF_LAST3_FRAME,
-  GST_AV1_REF_BWDREF_FRAME,
-  GST_AV1_REF_GOLDEN_FRAME,
-  GST_AV1_REF_ALTREF_FRAME,
-  GST_AV1_REF_ALTREF2_FRAME,
+  GST_AV1_REF_INTRA_FRAME = 0,
+  GST_AV1_REF_LAST_FRAME = 1,
+  GST_AV1_REF_LAST2_FRAME = 2,
+  GST_AV1_REF_LAST3_FRAME = 3,
+  GST_AV1_REF_BWDREF_FRAME = 4,
+  GST_AV1_REF_GOLDEN_FRAME = 5,
+  GST_AV1_REF_ALTREF_FRAME = 6,
+  GST_AV1_REF_ALTREF2_FRAME = 7,
 } GstAV1ReferenceFrame;
 
 /**
@@ -431,7 +430,6 @@ typedef enum {
  */
 
 struct _GstAV1OBUHeader {
-  guint8 obu_forbidden_bit;
   GstAV1OBUType obu_type;
   guint8 obu_extention_flag;
   guint8 obu_has_size_field;
@@ -439,7 +437,6 @@ struct _GstAV1OBUHeader {
   guint32 obu_size;
   guint8 obu_temporal_id;
   guint8 obu_spatial_id;
-  guint8 obu_extension_header_reserved_3bits;
 };
 
 
@@ -723,7 +720,7 @@ struct _GstAV1SequenceHeaderOBU {
 struct _GstAV1MetadataITUT_T35 {
   guint8 itu_t_t35_country_code;
   guint8 itu_t_t35_country_code_extention_byte;
-  // itu_t_t35_payload_bytes - not supported at the moment
+  /* itu_t_t35_payload_bytes - not supported at the moment */
 };
 
 /**
@@ -880,7 +877,7 @@ struct _GstAV1MetadataScalability {
  */
 
 struct _GstAV1MetadataTimecode {
-  guint8 counting_type; // candidate for sperate Type GstAV1TimecodeCountingType
+  guint8 counting_type; /* candidate for sperate Type GstAV1TimecodeCountingType */
   guint8 full_timestamp_flag;
   guint8 discontinuity_flag;
   guint8 cnt_dropped_flag;
@@ -949,7 +946,7 @@ struct _GstAV1MetadataOBU {
  */
 
 struct _GstAV1LoopFilterParams {
-  guint8 loop_filter_level[4]; //is 4 fixed??
+  guint8 loop_filter_level[4]; /*is 4 fixed?? */
   guint8 loop_filter_sharpness;
   guint8 loop_filter_delta_enabled;
   guint8 loop_filter_delta_update;
@@ -957,7 +954,7 @@ struct _GstAV1LoopFilterParams {
   guint8 update_ref_deltas[GST_AV1_TOTAL_REFS_PER_FRAME];
   guint8 loop_filter_ref_deltas[GST_AV1_TOTAL_REFS_PER_FRAME];
 
-  guint8 update_mode_deltas[2]; // is 2 fixed?
+  guint8 update_mode_deltas[2]; /* is 2 fixed? */
   guint8 loop_filter_mode_deltas[2];
 
   guint8 delta_lf_present;
@@ -1089,7 +1086,7 @@ struct _GstAV1TileInfo {
   guint32 MiRowStarts[GST_AV1_MAX_TILE_COUNT];
   guint8 maxTileHeightSb;
   guint8 context_update_tile_id;
-  //guint8 tile_size_bytes_minus_1;
+  /*guint8 tile_size_bytes_minus_1; */
   guint8 TileSizeBytes;
 };
 
@@ -1427,7 +1424,7 @@ struct _GstAV1FrameHeaderOBU {
   guint8 last_frame_idx;
   guint8 gold_frame_idx;
   guint8 ref_frame_idx[GST_AV1_NUM_REF_FRAMES];
-  guint32 delta_frame_id_minus_1; // present in for loop --> check obu.c
+  guint32 delta_frame_id_minus_1; /* present in for loop --> check obu.c */
   guint8 allow_high_precision_mv;
   guint8 is_motion_mode_switchable;
   guint8 use_ref_frame_mvs;
@@ -1465,14 +1462,14 @@ struct _GstAV1FrameHeaderOBU {
   GstAV1GlobalMotionParams global_motion_params;
   GstAV1FilmGrainParams film_grain_params;
   guint32 expectedFrameId[GST_AV1_NUM_REF_FRAMES];
-  guint32 OrderHints[GST_AV1_NUM_REF_FRAMES]; // is guint32 appropiat?
-  guint32 RefFrameSignBias[GST_AV1_NUM_REF_FRAMES]; // is guint32 appropiat?
+  guint32 OrderHints[GST_AV1_NUM_REF_FRAMES]; /* is guint32 appropiat? */
+  guint32 RefFrameSignBias[GST_AV1_NUM_REF_FRAMES]; /* is guint32 appropiat? */
   guint8 CodedLossless;
   guint8 AllLossless;
   guint8 LosslessArray[GST_AV1_MAX_SEGMENTS];
   guint8 SegQMLevel[3][GST_AV1_MAX_SEGMENTS];
   guint8 skipModeAllowed;
-  guint8 SkipModeFrame[2]; // is 2 appropiat?
+  guint8 SkipModeFrame[2]; /* is 2 appropiat? */
 
 
 };
@@ -1508,7 +1505,7 @@ struct _GstAV1ReferenceFrameInfo {
     guint32 RefRenderHeight;
     guint32 RefRenderWidth;
     GstAV1FrameType RefFrameType;
-    guint32 RefOrderHint; // is guint32 appropiat?
+    guint32 RefOrderHint; /* is guint32 appropiat? */
     guint32 RefMiCols;
     guint32 RefMiRows;
     guint8 RefBitDepth;
@@ -1551,7 +1548,7 @@ struct _GstAV1TileListOBU {
     guint8 anchor_tile_row;
     guint8 anchor_tile_col;
     guint16 tile_data_size_minus_1;
-    //guint8 coded_tile_data[]; //skipped
+    /*guint8 coded_tile_data[]; /*skipped */
   } entry[GST_AV1_MAX_TILE_COUNT];
 };
 
@@ -1626,7 +1623,7 @@ struct _GstAV1Parser {
   } state;
 
   GstAV1ReferenceFrameInfo ref_info;
-    //References
+  /*References */
   GstAV1SequenceHeaderOBU *seq_header;
   GstAV1FrameHeaderOBU *frame_header;
 };

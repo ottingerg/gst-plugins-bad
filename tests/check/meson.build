@@ -69,7 +69,6 @@ base_tests = [
   [['libs/av1parser.c'], false, [gstcodecparsers_dep]],
 ]
 
-
 test_defines = [
   '-UG_DISABLE_ASSERT',
   '-UG_DISABLE_CAST_CHECKS',
