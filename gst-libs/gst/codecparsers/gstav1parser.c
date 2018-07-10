@@ -363,7 +363,6 @@ gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
 {
   GstAV1ParserResult retval;
   guint8 obu_forbidden_bit;
-  guint8 obu_extension_header_reserved_3bits;
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -377,12 +376,12 @@ gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
   obu_header->obu_type = gst_av1_read_bits (br, 4);
   obu_header->obu_extention_flag = gst_av1_read_bit (br);
   obu_header->obu_has_size_field = gst_av1_read_bit (br);
-  obu_header->obu_reserved_1bit = gst_av1_read_bit (br);
+  gst_av1_read_bit (br);        /* obu_reserved_1bit */
 
   if (obu_header->obu_extention_flag) {
     obu_header->obu_temporal_id = gst_av1_read_bits (br, 3);
     obu_header->obu_spatial_id = gst_av1_read_bits (br, 2);
-    obu_extension_header_reserved_3bits = gst_av1_read_bits (br, 3);
+    gst_av1_read_bits (br, 3);  /* obu_extension_header_reserved_3bits */
 
     parser->state.temporal_id = obu_header->obu_temporal_id;
     parser->state.spatial_id = obu_header->obu_spatial_id;
@@ -528,7 +527,6 @@ static GstAV1ParserResult
 gst_av1_parse_operating_parameters_info (GstAV1Parser * parser,
     GstBitReader * br, GstAV1OperatingPoint * op_point)
 {
-  GstAV1ParserResult retval;
   GstAV1SequenceHeaderOBU *seq_header;
 
   GST_AV1_DEBUG_HELPER ();
@@ -620,11 +618,10 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
       }
 
       if (seq_header->initial_display_delay_present_flag) {
-        seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op =
-            gst_av1_read_bit (br);
-        if (seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op)
+        seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op = gst_av1_read_bit (br);
+        if (seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op)
           seq_header->operating_points[i].initial_display_delay_minus_1 =
               gst_av1_read_bits (br, 4);
       }
@@ -781,18 +778,17 @@ gst_av1_parse_metadata_scalability (GstAV1Parser * parser, GstBitReader * br,
     GstAV1MetadataScalability * scalability)
 {
   gint i, j;
-  guint8 scalability_structure_reserved_3bits;
 
   GST_AV1_DEBUG_HELPER ();
 
   scalability->scalability_mode_idc = gst_av1_read_bits (br, 8);
-  if (scalability->scalability_mode_idc == GST_AV1GST_AV1_SCALABILITY_SS) {
+  if (scalability->scalability_mode_idc == GST_AV1_SCALABILITY_SS) {
     scalability->spatial_layers_cnt_minus_1 = gst_av1_read_bits (br, 2);
     scalability->spatial_layer_dimensions_present_flag = gst_av1_read_bit (br);
     scalability->spatial_layer_description_present_flag = gst_av1_read_bit (br);
     scalability->temporal_group_description_present_flag =
         gst_av1_read_bit (br);
-    scalability_structure_reserved_3bits = gst_av1_read_bits (br, 3);
+    gst_av1_read_bits (br, 3);  /*scalability_structure_reserved_3bits */
     if (scalability->spatial_layer_dimensions_present_flag) {
       for (i = 0; i <= scalability->spatial_layers_cnt_minus_1; i++) {
         scalability->spatial_layer_max_width[i] = gst_av1_read_bits (br, 16);
@@ -924,6 +920,7 @@ gst_av1_parse_superres_params_compute_image_size (GstAV1Parser * parser,
   }
   seq_header = parser->seq_header;
 
+  /* superres_params() */
   if (seq_header->enable_superres) {
     frame_header->use_superres = gst_av1_read_bit (br);
   } else {
@@ -943,7 +940,7 @@ gst_av1_parse_superres_params_compute_image_size (GstAV1Parser * parser,
       (frame_header->UpscaledWidth * GST_AV1_SUPERRES_NUM +
       (frame_header->SuperresDenom / 2)) / frame_header->SuperresDenom;
 
-  /* compute_image_size: */
+  /* compute_image_size() */
   frame_header->MiCols = 2 * ((frame_header->FrameWidth + 7) >> 3);
   frame_header->MiRows = 2 * ((frame_header->FrameHeight + 7) >> 3);
 
@@ -1165,8 +1162,9 @@ gst_av1_parse_segmentation_params (GstAV1Parser * parser, GstBitReader * br,
           if (seg_params->FeatureEnabled[i][j]) {
             gint bitsToRead = Segmentation_Feature_Bits[j];
             gint limit = Segmentation_Feature_Max[j];
-            if (Segmentation_Feature_Signed[j]) {
-              feature_value = gst_av1_bitstreamfn_su (br, bitsToRead, &retval);
+            if (Segmentation_Feature_Signed[j] == 1) {
+              feature_value =
+                  gst_av1_bitstreamfn_su (br, 1 + bitsToRead, &retval);
               GST_AV1_EVAL_RETVAL_LOGGED (retval);
               clipped_value =
                   gst_av1_helper_Clip3 (limit * (-1), limit, feature_value);
@@ -1352,7 +1350,7 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
     tile_info->context_update_tile_id =
         gst_av1_read_bits (br,
         tile_info->TileColsLog2 + tile_info->TileRowsLog2);
-    tile_size_bytes_minus_1 = gst_av1_read_bit (br);
+    tile_size_bytes_minus_1 = gst_av1_read_bits (br, 2);
     tile_info->TileSizeBytes = tile_size_bytes_minus_1 + 1;
   } else {
     tile_info->context_update_tile_id = 0;
@@ -1570,8 +1568,8 @@ gst_av1_parse_loop_restoration_params (GstAV1Parser * parser, GstBitReader * br,
   if (frame_header->AllLossless || frame_header->allow_intrabc
       || !seq_header->enable_restoration) {
     lr_params->FrameRestorationType[0] = GST_AV1_FRAME_RESTORE_NONE;
-    lr_params->FrameRestorationType[0] = GST_AV1_FRAME_RESTORE_NONE;
-    lr_params->FrameRestorationType[0] = GST_AV1_FRAME_RESTORE_NONE;
+    lr_params->FrameRestorationType[1] = GST_AV1_FRAME_RESTORE_NONE;
+    lr_params->FrameRestorationType[2] = GST_AV1_FRAME_RESTORE_NONE;
     lr_params->UsesLr = 0;
     return GST_AV1_PARSER_OK;
   }
@@ -1660,6 +1658,13 @@ gst_av1_parse_skip_mode_params (GstAV1Parser * parser, GstBitReader * br,
   GstAV1SequenceHeaderOBU *seq_header;
   gint i;
   gint skipModeAllowed;
+  gint forwardHint;
+  gint forwardIdx;
+  gint backwardIdx;
+  gint backwardHint;
+  gint refHint;
+  gint secondForwardIdx;
+  gint secondForwardHint;
 
   GST_AV1_DEBUG_HELPER ();
 
@@ -1677,11 +1682,8 @@ gst_av1_parse_skip_mode_params (GstAV1Parser * parser, GstBitReader * br,
       || !seq_header->enable_order_hint) {
     frame_header->skipModeAllowed = 0;
   } else {
-    gint forwardIdx = -1;
-    gint forwardHint = 0;
-    gint backwardIdx = -1;
-    gint backwardHint = 0;
-    gint refHint = 0;
+    forwardIdx = -1;
+    backwardIdx = -1;
 
     for (i = 0; i < GST_AV1_REFS_PER_FRAME; i++) {
       refHint = ref_info->entry[frame_header->ref_frame_idx[i]].RefOrderHint;
@@ -1713,8 +1715,7 @@ gst_av1_parse_skip_mode_params (GstAV1Parser * parser, GstBitReader * br,
       frame_header->SkipModeFrame[1] =
           GST_AV1_REF_LAST_FRAME + gst_av1_helper_Max (forwardIdx, backwardIdx);
     } else {
-      gint secondForwardIdx = -1;
-      gint secondForwardHint = 0;
+      secondForwardIdx = -1;
       for (i = 0; i < GST_AV1_REFS_PER_FRAME; i++) {
         refHint = ref_info->entry[frame_header->ref_frame_idx[i]].RefOrderHint;
         if (gst_av1_get_relative_dist (parser->seq_header, refHint,
@@ -1828,8 +1829,8 @@ gst_av1_parse_global_param (GstAV1Parser * parser, GstBitReader * br,
   GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
   gint precDiff, wm_round, mx, r;
-  gint absBits = GST_AV1_GM_ABS_ALPHA_BITS;
-  gint precBits = GST_AV1_GM_ALPHA_PREC_BITS;
+  gint absBits;
+  gint precBits;
   /*gint sub; */
 
   GST_AV1_DEBUG_HELPER ();
@@ -1840,6 +1841,8 @@ gst_av1_parse_global_param (GstAV1Parser * parser, GstBitReader * br,
   }
   frame_header = parser->frame_header;
 
+  absBits = GST_AV1_GM_ABS_ALPHA_BITS;
+  precBits = GST_AV1_GM_ALPHA_PREC_BITS;
   if (idx < 2) {
     if (type == GST_AV1_WARP_MODEL_TRANSLATION) {
       absBits =
@@ -1858,7 +1861,7 @@ gst_av1_parse_global_param (GstAV1Parser * parser, GstBitReader * br,
   wm_round = (idx % 3) == 2 ? (1 << GST_AV1_WARPEDMODEL_PREC_BITS) : 0;
   /*sub = (idx % 3) == 2 ? (1 << precBits) : 0; */
   mx = (1 << absBits);
-  /*int r = (PrevGmParams[ref][idx] >> precDiff) - sub; /*TODO: PrevGMParams is missing */
+  /*int r = (PrevGmParams[ref][idx] >> precDiff) - sub; TODO: PrevGMParams is missing */
   r = 0;                        /*HACK-Warning PrevGmParams are not supported yet - bits for reading are defined with mx parameter */
   gm_params->gm_params[ref][idx] =
       (gst_av1_decode_signed_subexp_with_ref (br, -mx, mx + 1, r,
@@ -1959,14 +1962,14 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
 
   if (!seq_header->film_grain_params_present || (!frame_header->show_frame
           && !frame_header->showable_frame)) {
-    /*reset_grain_params() /*TODO: implement reset_grain_params */
+    /*reset_grain_params() TODO: implement reset_grain_params */
     return GST_AV1_PARSER_OK;
   }
 
   fg_params->apply_grain = gst_av1_read_bit (br);
 
   if (!fg_params->apply_grain) {
-    /*reset_grain_params() /*TODO: impl. */
+    /*reset_grain_params() TODO: impl. */
     return GST_AV1_PARSER_OK;
   }
 
@@ -1982,7 +1985,7 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
     fg_params->film_grain_params_ref_idx = gst_av1_read_bits (br, 3);
 
     /* TODO- look at the following:
-       /*tempGrainSeed = grain_seed
+       tempGrainSeed = grain_seed
        load_grain_params( film_grain_params_ref_idx )
        grain_seed = tempGrainSeed
        return
@@ -2161,10 +2164,11 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
       frame_header->frame_to_show_map_idx = gst_av1_read_bits (br, 3);
       if (seq_header->decoder_model_info_present_flag
           && !seq_header->timing_info.equal_picture_interval)
+        /*inline temporal_point_info */
         frame_header->frame_presentation_time =
             gst_av1_read_bits (br,
-            seq_header->
-            decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+            seq_header->decoder_model_info.
+            frame_presentation_time_length_minus_1 + 1);
       frame_header->refresh_frame_flags = 0;
       if (seq_header->frame_id_numbers_present_flag) {
         frame_header->display_frame_id = gst_av1_read_bits (br, idLen);
@@ -2189,10 +2193,11 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     frame_header->show_frame = gst_av1_read_bit (br);
     if (frame_header->show_frame && seq_header->decoder_model_info_present_flag
         && !seq_header->timing_info.equal_picture_interval)
+      /*inline temporal_point_info */
       frame_header->frame_presentation_time =
           gst_av1_read_bits (br,
-          seq_header->
-          decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+          seq_header->decoder_model_info.
+          frame_presentation_time_length_minus_1 + 1);
 
     if (frame_header->show_frame)
       frame_header->showable_frame = 0;
@@ -2272,16 +2277,16 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     if (frame_header->buffer_removal_time_present_flag) {
       for (opNum = 0; opNum <= seq_header->operating_points_cnt_minus_1;
           opNum++) {
-        if (seq_header->
-            operating_points[opNum].decoder_model_present_for_this_op) {
+        if (seq_header->operating_points[opNum].
+            decoder_model_present_for_this_op) {
           gint opPtIdc = seq_header->operating_points[opNum].idc;
           gint inTemporalLayer = (opPtIdc >> parser->state.temporal_id) & 1;
           gint inSpatialLayer = (opPtIdc >> (parser->state.spatial_id + 8)) & 1;
           if (opPtIdc == 0 || (inTemporalLayer && inSpatialLayer))
             frame_header->buffer_removal_time[opNum] =
                 gst_av1_read_bits (br,
-                seq_header->
-                decoder_model_info.buffer_removal_time_length_minus_1 + 1);
+                seq_header->decoder_model_info.
+                buffer_removal_time_length_minus_1 + 1);
         }
       }
     }
@@ -2309,8 +2314,7 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
       }
     }
   }
-  /*here comes a concious simplification of the Spec 20180614 handeling KEY_FRAME and INTRA_ONLY_FRAME the same warranty */
-  /*TODO: Recheck this section with recent Spec - before merging */
+  /*here comes a concious simplification of the Spec handeling KEY_FRAME and INTRA_ONLY_FRAME the if case */
   if (frame_header->frame_type == GST_AV1_KEY_FRAME
       || frame_header->frame_type == GST_AV1_INTRA_ONLY_FRAME) {
     gst_av1_parse_frame_size (parser, br, frame_header);
@@ -2654,7 +2658,7 @@ gst_av1_decode_frame_wrapup (GstAV1Parser * parser)
   frame_header = parser->frame_header;
 
   /*if(frame_header->show_existing_frame = 0 ) {
-     /* decoder would perform post processing filtering see section 7.4. Decode frame wrapup Process
+     decoder would perform post processing filtering see section 7.4. Decode frame wrapup Process
      if(frame_header->segmentation_params.segmentation_enabled && !frame_header->segmentation_params.segmentation_enabled) {
      SegmentIds[ row ][ col ] is set equal to PrevSegmentIds[ row ][ col ] for row = 0..MiRows-1, for col = 0..MiCols-1.
      }

@@ -64,25 +64,21 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   br = gst_bit_reader_new (aom_testdata_av1_1_b8_01_size_16x16,
       sizeof (aom_testdata_av1_1_b8_01_size_16x16));
 
-  //1st OBU should be OBU_TEMPORAL_DELIMITER
+  /* 1st OBU should be OBU_TEMPORAL_DELIMITER */
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_forbidden_bit, 0);
   assert_equals_int (obu_header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
   assert_equals_int (obu_header.obu_extention_flag, 0);
   assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_reserved_1bit, 0);
   assert_equals_int (obu_header.obu_size, 0);
 
   gst_av1_parse_temporal_delimiter_obu (parser, br);
 
 
-  //2nd OBU should be OBU_SEQUENCE_HEADER
+  /* 2nd OBU should be OBU_SEQUENCE_HEADER */
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_forbidden_bit, 0);
   assert_equals_int (obu_header.obu_type, GST_AV1_OBU_SEQUENCE_HEADER);
   assert_equals_int (obu_header.obu_extention_flag, 0);
   assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_reserved_1bit, 0);
   assert_equals_int (obu_header.obu_size, 10);
 
   gst_av1_parse_sequence_header_obu (parser, br, &seq_header);
@@ -102,41 +98,205 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   assert_equals_int (seq_header.use_128x128_superblock, 1);
   assert_equals_int (seq_header.enable_filter_intra, 1);
   assert_equals_int (seq_header.enable_intra_edge_filter, 1);
+  assert_equals_int (seq_header.enable_interintra_compound, 1);
+  assert_equals_int (seq_header.enable_masked_compound, 1);
+  assert_equals_int (seq_header.enable_warped_motion, 1);
+  assert_equals_int (seq_header.enable_dual_filter, 1);
+  assert_equals_int (seq_header.enable_order_hint, 1);
+  assert_equals_int (seq_header.enable_jnt_comp, 1);
+  assert_equals_int (seq_header.enable_ref_frame_mvs, 1);
+  assert_equals_int (seq_header.seq_choose_screen_content_tools, 1);
+  assert_equals_int (seq_header.seq_choose_integer_mv, 1);
+  assert_equals_int (seq_header.order_hint_bits_minus_1, 6);
+  assert_equals_int (seq_header.enable_superres, 0);
+  assert_equals_int (seq_header.enable_cdef, 1);
+  assert_equals_int (seq_header.enable_restoration, 1);
+  assert_equals_int (seq_header.color_config.high_bitdepth, 0);
+  assert_equals_int (seq_header.color_config.mono_chrome, 0);
+  assert_equals_int (seq_header.color_config.color_description_present_flag, 0);
+  assert_equals_int (seq_header.color_config.chroma_sample_position,
+      GST_AV1_CSP_UNKNOWN);
+  assert_equals_int (seq_header.color_config.separate_uv_delta_q, 0);
+  assert_equals_int (seq_header.film_grain_params_present, 0);
 
 
-  //3rd OBU should be GST_AV1_OBU_FRAME
+
+
+  /* 3rd OBU should be GST_AV1_OBU_FRAME */
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_forbidden_bit, 0);
   assert_equals_int (obu_header.obu_type, GST_AV1_OBU_FRAME);
   assert_equals_int (obu_header.obu_extention_flag, 0);
   assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_reserved_1bit, 0);
   assert_equals_int (obu_header.obu_size, 166);
 
   gst_av1_parse_frame_obu (parser, br, &frame);
+  assert_equals_int (frame.frame_header.show_existing_frame, 0);
+  assert_equals_int (frame.frame_header.frame_type, GST_AV1_KEY_FRAME);
+  assert_equals_int (frame.frame_header.show_frame, 1);
+  assert_equals_int (frame.frame_header.disable_cdf_update, 0);
+  assert_equals_int (frame.frame_header.allow_screen_content_tools, 0);
+  assert_equals_int (frame.frame_header.frame_size_override_flag, 0);
+  assert_equals_int (frame.frame_header.order_hint, 0);
+  assert_equals_int (frame.frame_header.render_and_frame_size_different, 0);
+  assert_equals_int (frame.frame_header.disable_frame_end_update_cdf, 0);
+  assert_equals_int (frame.frame_header.tile_info.uniform_tile_spacing_flag, 1);
+  assert_equals_int (frame.frame_header.quantization_params.base_q_idx, 15);
+  assert_equals_int (frame.frame_header.quantization_params.DeltaQYDc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.DeltaQUDc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.DeltaQUAc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.using_qmatrix, 0);
+  assert_equals_int (frame.frame_header.quantization_params.delta_q_present, 0);
+  assert_equals_int (frame.frame_header.loop_filter_params.loop_filter_level[0],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.loop_filter_level[1],
+      0);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.loop_filter_sharpness, 0);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.loop_filter_delta_enabled, 1);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.loop_filter_delta_update, 1);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[0],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[1],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[2],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[3],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[4],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[5],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[6],
+      0);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.update_mode_deltas[0], 0);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.update_mode_deltas[1], 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_damping_minus_3, 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_bits, 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_y_pri_strength[0], 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_y_sec_strength[0], 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_uv_pri_strength[0], 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_uv_sec_strength[0], 1);
+  assert_equals_int (frame.frame_header.
+      loop_restoration_params.FrameRestorationType[0],
+      GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.
+      loop_restoration_params.FrameRestorationType[1],
+      GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.
+      loop_restoration_params.FrameRestorationType[2],
+      GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.tx_mode_select, 0);
+  assert_equals_int (frame.frame_header.reduced_tx_set, 0);
 
-  //4th OBU should be OBU_TEMPORAL_DELIMITER
+
+  /* 4th OBU should be OBU_TEMPORAL_DELIMITER */
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_forbidden_bit, 0);
   assert_equals_int (obu_header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
   assert_equals_int (obu_header.obu_extention_flag, 0);
   assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_reserved_1bit, 0);
   assert_equals_int (obu_header.obu_size, 0);
 
   gst_av1_parse_temporal_delimiter_obu (parser, br);
 
 
-  //5th OBU should be GST_AV1_OBU_FRAME
+  /* 5th OBU should be GST_AV1_OBU_FRAME */
   gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_forbidden_bit, 0);
   assert_equals_int (obu_header.obu_type, GST_AV1_OBU_FRAME);
   assert_equals_int (obu_header.obu_extention_flag, 0);
   assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_reserved_1bit, 0);
   assert_equals_int (obu_header.obu_size, 75);
 
   gst_av1_parse_frame_obu (parser, br, &frame);
+  assert_equals_int (frame.frame_header.show_existing_frame, 0);
+  assert_equals_int (frame.frame_header.frame_type, GST_AV1_INTER_FRAME);
+  assert_equals_int (frame.frame_header.show_frame, 1);
+  assert_equals_int (frame.frame_header.error_resilient_mode, 0);
+  assert_equals_int (frame.frame_header.disable_cdf_update, 0);
+  assert_equals_int (frame.frame_header.allow_screen_content_tools, 0);
+  assert_equals_int (frame.frame_header.frame_size_override_flag, 0);
+  assert_equals_int (frame.frame_header.order_hint, 1);
+  assert_equals_int (frame.frame_header.primary_ref_frame, 7);
+  assert_equals_int (frame.frame_header.refresh_frame_flags, 12);
+  assert_equals_int (frame.frame_header.frame_refs_short_signaling, 0);
+  assert_equals_int (frame.frame_header.ref_frame_idx[0], 0);
+  assert_equals_int (frame.frame_header.ref_frame_idx[1], 1);
+  assert_equals_int (frame.frame_header.ref_frame_idx[2], 2);
+  assert_equals_int (frame.frame_header.ref_frame_idx[3], 3);
+  assert_equals_int (frame.frame_header.ref_frame_idx[4], 4);
+  assert_equals_int (frame.frame_header.ref_frame_idx[5], 5);
+  assert_equals_int (frame.frame_header.ref_frame_idx[6], 6);
+  assert_equals_int (frame.frame_header.allow_high_precision_mv, 1);
+  assert_equals_int (frame.frame_header.is_filter_switchable, 0);
+  assert_equals_int (frame.frame_header.interpolation_filter,
+      GST_AV1_INTERPOLATION_FILTER_EIGHTTAP);
+  assert_equals_int (frame.frame_header.is_motion_mode_switchable, 1);
+  assert_equals_int (frame.frame_header.use_ref_frame_mvs, 1);
+  assert_equals_int (frame.frame_header.disable_frame_end_update_cdf, 0);
+  assert_equals_int (frame.frame_header.quantization_params.base_q_idx, 20);
+  assert_equals_int (frame.frame_header.quantization_params.DeltaQYDc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.DeltaQUDc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.DeltaQUAc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.using_qmatrix, 0);
+  assert_equals_int (frame.frame_header.
+      segmentation_params.segmentation_enabled, 0);
+  assert_equals_int (frame.frame_header.quantization_params.delta_q_present, 0);
+  assert_equals_int (frame.frame_header.loop_filter_params.loop_filter_level[0],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.loop_filter_level[1],
+      0);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.loop_filter_sharpness, 0);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.loop_filter_delta_enabled, 1);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.loop_filter_delta_update, 1);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[0],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[1],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[2],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[3],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[4],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[5],
+      0);
+  assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[6],
+      0);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.update_mode_deltas[0], 0);
+  assert_equals_int (frame.frame_header.
+      loop_filter_params.update_mode_deltas[1], 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_damping_minus_3, 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_bits, 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_y_pri_strength[0], 1);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_y_sec_strength[0], 1);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_uv_pri_strength[0], 0);
+  assert_equals_int (frame.frame_header.cdef_params.cdef_uv_sec_strength[0], 4);
+  assert_equals_int (frame.frame_header.
+      loop_restoration_params.FrameRestorationType[0],
+      GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.
+      loop_restoration_params.FrameRestorationType[1],
+      GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.
+      loop_restoration_params.FrameRestorationType[2],
+      GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.tx_mode_select, 0);
+  assert_equals_int (frame.frame_header.reference_select, 0);
+  assert_equals_int (frame.frame_header.allow_warped_motion, 1);
+  assert_equals_int (frame.frame_header.reduced_tx_set, 0);
+  assert_equals_int (frame.frame_header.global_motion_params.is_global[1], 0);
+  assert_equals_int (frame.frame_header.global_motion_params.is_global[2], 0);
+  assert_equals_int (frame.frame_header.global_motion_params.is_global[3], 0);
+  assert_equals_int (frame.frame_header.global_motion_params.is_global[4], 0);
+  assert_equals_int (frame.frame_header.global_motion_params.is_global[5], 0);
+  assert_equals_int (frame.frame_header.global_motion_params.is_global[6], 0);
 
 
   gst_bit_reader_free (br);

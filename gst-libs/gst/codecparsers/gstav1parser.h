@@ -1531,7 +1531,7 @@ struct _GstAV1TileListOBU {
     guint8 anchor_tile_row;
     guint8 anchor_tile_col;
     guint16 tile_data_size_minus_1;
-    /*guint8 coded_tile_data[]; /*skipped */
+    /*guint8 coded_tile_data[]; skipped */
   } entry[GST_AV1_MAX_TILE_COUNT];
 };
 
