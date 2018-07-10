@@ -313,7 +313,7 @@ gst_av1_bitstreamfn_delta_q (GstBitReader * br, GstAV1ParserResult * retval)
 }
 
 static GstAV1ParserResult
-gst_av1_bitstreamfn_trailing_bits (GstBitReader * br, GstAV1Size nbBits)
+gst_av1_bitstreamfn_trailing_bits (GstBitReader * br, gsize nbBits)
 {
   guint8 trailing_one_bit, trailing_zero_bit;
 
@@ -344,7 +344,7 @@ static GstAV1ParserResult
 gst_av1_skip_trailing_bits (GstAV1Parser * parser, GstBitReader * br)
 {
   guint64 currentPosition;
-  GstAV1Size payloadBits;
+  gsize payloadBits;
   if (parser->state.obu_size > 0
       && parser->state.obu_type != GST_AV1_OBU_TILE_GROUP
       && parser->state.obu_type != GST_AV1_OBU_FRAME) {
@@ -359,7 +359,7 @@ gst_av1_skip_trailing_bits (GstAV1Parser * parser, GstBitReader * br)
 
 GstAV1ParserResult
 gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1OBUHeader * obu_header, GstAV1Size annexb_sz)
+    GstAV1OBUHeader * obu_header, gsize annexb_sz)
 {
   GstAV1ParserResult retval;
   guint8 obu_forbidden_bit;
@@ -618,10 +618,11 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br,
       }
 
       if (seq_header->initial_display_delay_present_flag) {
-        seq_header->operating_points[i].
-            initial_display_delay_present_for_this_op = gst_av1_read_bit (br);
-        if (seq_header->operating_points[i].
-            initial_display_delay_present_for_this_op)
+        seq_header->
+            operating_points[i].initial_display_delay_present_for_this_op =
+            gst_av1_read_bit (br);
+        if (seq_header->
+            operating_points[i].initial_display_delay_present_for_this_op)
           seq_header->operating_points[i].initial_display_delay_minus_1 =
               gst_av1_read_bits (br, 4);
       }
@@ -2167,8 +2168,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
         /*inline temporal_point_info */
         frame_header->frame_presentation_time =
             gst_av1_read_bits (br,
-            seq_header->decoder_model_info.
-            frame_presentation_time_length_minus_1 + 1);
+            seq_header->
+            decoder_model_info.frame_presentation_time_length_minus_1 + 1);
       frame_header->refresh_frame_flags = 0;
       if (seq_header->frame_id_numbers_present_flag) {
         frame_header->display_frame_id = gst_av1_read_bits (br, idLen);
@@ -2196,8 +2197,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
       /*inline temporal_point_info */
       frame_header->frame_presentation_time =
           gst_av1_read_bits (br,
-          seq_header->decoder_model_info.
-          frame_presentation_time_length_minus_1 + 1);
+          seq_header->
+          decoder_model_info.frame_presentation_time_length_minus_1 + 1);
 
     if (frame_header->show_frame)
       frame_header->showable_frame = 0;
@@ -2277,16 +2278,16 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     if (frame_header->buffer_removal_time_present_flag) {
       for (opNum = 0; opNum <= seq_header->operating_points_cnt_minus_1;
           opNum++) {
-        if (seq_header->operating_points[opNum].
-            decoder_model_present_for_this_op) {
+        if (seq_header->
+            operating_points[opNum].decoder_model_present_for_this_op) {
           gint opPtIdc = seq_header->operating_points[opNum].idc;
           gint inTemporalLayer = (opPtIdc >> parser->state.temporal_id) & 1;
           gint inSpatialLayer = (opPtIdc >> (parser->state.spatial_id + 8)) & 1;
           if (opPtIdc == 0 || (inTemporalLayer && inSpatialLayer))
             frame_header->buffer_removal_time[opNum] =
                 gst_av1_read_bits (br,
-                seq_header->decoder_model_info.
-                buffer_removal_time_length_minus_1 + 1);
+                seq_header->
+                decoder_model_info.buffer_removal_time_length_minus_1 + 1);
         }
       }
     }
@@ -2707,7 +2708,7 @@ gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstBitReader * br,
 
 GstAV1ParserResult
 gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1Size sz, GstAV1TileGroupOBU * tile_group)
+    gsize sz, GstAV1TileGroupOBU * tile_group)
 {
   GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
@@ -2858,6 +2859,18 @@ gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br,
       parser->state.obu_size - headerBytes, &(frame->tile_group));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
 
+
+  return GST_AV1_PARSER_OK;
+}
+
+GstAV1ParserResult
+gst_av1_parse_annexb_unit_size (GstAV1Parser * parser, GstBitReader * br,
+    gsize * unit_size)
+{
+  GST_AV1_DEBUG_HELPER ();
+
+  *unit_size = gst_av1_bitstreamfn_leb128 (br, &retval);
+  GST_AV1_EVAL_RETVAL_LOGGED (retval);
 
   return GST_AV1_PARSER_OK;
 }

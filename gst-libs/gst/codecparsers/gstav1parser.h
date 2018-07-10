@@ -92,8 +92,6 @@ G_BEGIN_DECLS
 #define GST_AV1_RESTORATION_TILESIZE_MAX 256
 #define GST_AV1_SEG_LVL_REF_FRAME 5
 
-typedef guint32 GstAV1Size;
-
 typedef struct _GstAV1Parser GstAV1Parser;
 
 typedef struct _GstAV1OBUHeader GstAV1OBUHeader;
@@ -1601,7 +1599,7 @@ struct _GstAV1Parser {
     guint8 temporal_id;
     guint8 spatial_id;
     guint64 obu_start_position;
-    GstAV1Size obu_size;
+    gsize obu_size;
     GstAV1OBUType obu_type;
   } state;
 
@@ -1611,12 +1609,17 @@ struct _GstAV1Parser {
   GstAV1FrameHeaderOBU *frame_header;
 };
 
+/**
+ * GstAV1AnnexB:
+ *
+ */
+
 
 GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br, GstAV1OBUHeader * obu_header, GstAV1Size annexb_sz);
+GstAV1ParserResult gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br, GstAV1OBUHeader * obu_header, gsize annexb_sz);
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1SequenceHeaderOBU * seq_header);
@@ -1631,7 +1634,7 @@ GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1TileListOBU * tile_list);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1Size sz, GstAV1TileGroupOBU * tile_group);
+GstAV1ParserResult gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstBitReader * br, gsize sz, GstAV1TileGroupOBU * tile_group);
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameHeaderOBU * frame_header);
@@ -1639,6 +1642,8 @@ GstAV1ParserResult gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstBit
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameOBU * frame);
 
+GstAV1ParserResult
+gst_av1_parse_annexb_unit_size(GstAV1Parser * parser, GstBitReader * br, gsize * unit_size);
 
 GST_CODEC_PARSERS_API
 void               gst_av1_parser_free (GstAV1Parser * parser);
