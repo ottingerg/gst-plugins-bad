@@ -435,6 +435,7 @@ struct _GstAV1OBUHeader {
   guint32 obu_size;
   guint8 obu_temporal_id;
   guint8 obu_spatial_id;
+  guint8 obu_extension_header_reserved_3bits;
 };
 
 
@@ -1594,14 +1595,12 @@ struct _GstAV1FrameOBU {
  */
 
 struct _GstAV1Parser {
-  struct {
-    guint8 SeenFrameHeader;
-    guint8 temporal_id;
-    guint8 spatial_id;
-    guint64 obu_start_position;
-    gsize obu_size;
-    GstAV1OBUType obu_type;
-  } state;
+
+  void *priv;
+
+  guint8 subsampling_x;
+  guint8 subsampling_y;
+  guint8 BitDepth;
 
   GstAV1ReferenceFrameInfo ref_info;
   /*References */
