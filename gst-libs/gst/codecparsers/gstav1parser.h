@@ -479,11 +479,11 @@ struct _GstAV1OperatingPoint {
   guint8 seq_level_idx;
   guint8 seq_tier;
   guint16 idc;
-  guint8 decoder_model_present_for_this_op;
+  gboolean decoder_model_present_for_this_op;
   guint8 decoder_buffer_delay;
   guint8 encoder_buffer_delay;
-  guint8 low_delay_mode_flag;
-  guint8 initial_display_delay_present_for_this_op;
+  gboolean low_delay_mode_flag;
+  gboolean initial_display_delay_present_for_this_op;
   guint8 initial_display_delay_minus_1;
 };
 
@@ -559,8 +559,8 @@ struct _GstAV1TimingInfo {
 struct _GstAV1ColorConfig {
   guint8 high_bitdepth;
   guint8 twelve_bit;
-  guint8 mono_chrome;
-  guint8 color_description_present_flag;
+  gboolean mono_chrome;
+  gboolean color_description_present_flag;
   GstAV1ColorPrimaries color_primaries;
   GstAV1TransferCharacteristics transfer_characteristics;
   GstAV1MatrixCoefficients matrix_coefficients;
@@ -568,7 +568,7 @@ struct _GstAV1ColorConfig {
   guint8 subsampling_x;
   guint8 subsampling_y;
   GstAV1ChromaSamplePositions chroma_sample_position;
-  guint8 separate_uv_delta_q;
+  gboolean separate_uv_delta_q;
   guint8 BitDepth;
   guint8 NumPlanes;
 };
@@ -644,8 +644,8 @@ struct _GstAV1ColorConfig {
 
 struct _GstAV1SequenceHeaderOBU {
   guint8 seq_profile;
-  guint8 still_picture;
-  guint8 reduced_still_picture_header;
+  gboolean still_picture;
+  gboolean reduced_still_picture_header;
 
 
   guint8 frame_width_bits_minus_1;
@@ -656,36 +656,36 @@ struct _GstAV1SequenceHeaderOBU {
   guint8 delta_frame_id_length_minus_2;
   guint8 additional_frame_id_length_minus_1;
   guint8 use_128x128_superblock;
-  guint8 enable_filter_intra;
-  guint8 enable_intra_edge_filter;
-  guint8 enable_interintra_compound;
-  guint8 enable_masked_compound;
-  guint8 enable_warped_motion;
-  guint8 enable_dual_filter;
-  guint8 enable_order_hint;
-  guint8 enable_jnt_comp;
-  guint8 enable_ref_frame_mvs;
+  gboolean enable_filter_intra;
+  gboolean enable_intra_edge_filter;
+  gboolean enable_interintra_compound;
+  gboolean enable_masked_compound;
+  gboolean enable_warped_motion;
+  gboolean enable_dual_filter;
+  gboolean enable_order_hint;
+  gboolean enable_jnt_comp;
+  gboolean enable_ref_frame_mvs;
   guint8 seq_choose_screen_content_tools;
   guint8 seq_force_screen_content_tools;
   guint8 seq_choose_integer_mv;
   guint8 seq_force_integer_mv;
   guint8 order_hint_bits_minus_1;
 
-  guint8 enable_superres;
-  guint8 enable_cdef;
-  guint8 enable_restoration;
+  gboolean enable_superres;
+  gboolean enable_cdef;
+  gboolean enable_restoration;
 
-  guint8 film_grain_params_present;
+  gboolean film_grain_params_present;
 
 
   guint8 operating_points_cnt_minus_1;
   GstAV1OperatingPoint operating_points[GST_AV1_MAX_OPERATING_POINTS];
 
-  guint8 decoder_model_info_present_flag;
+  gboolean decoder_model_info_present_flag;
   GstAV1DecoderModelInfo decoder_model_info;
-  guint8 initial_display_delay_present_flag;
+  gboolean initial_display_delay_present_flag;
 
-  guint8 timing_info_present_flag;
+  gboolean timing_info_present_flag;
   GstAV1TimingInfo timing_info;
 
   GstAV1ColorConfig color_config;
@@ -860,15 +860,15 @@ struct _GstAV1MetadataScalability {
 
 struct _GstAV1MetadataTimecode {
   guint8 counting_type; /* candidate for sperate Type GstAV1TimecodeCountingType */
-  guint8 full_timestamp_flag;
-  guint8 discontinuity_flag;
-  guint8 cnt_dropped_flag;
+  gboolean full_timestamp_flag;
+  gboolean discontinuity_flag;
+  gboolean cnt_dropped_flag;
   guint8 n_frames;
-  guint8 seconds_flag;
+  gboolean seconds_flag;
   guint8 seconds_value;
-  guint8 minutes_flag;
+  gboolean minutes_flag;
   guint8 minutes_value;
-  guint8 hours_flag;
+  gboolean hours_flag;
   guint8 hours_value;
   guint8 time_offset_length;
   guint32 time_offset_value;
@@ -930,16 +930,16 @@ struct _GstAV1MetadataOBU {
 struct _GstAV1LoopFilterParams {
   guint8 loop_filter_level[4]; /*is 4 fixed?? */
   guint8 loop_filter_sharpness;
-  guint8 loop_filter_delta_enabled;
-  guint8 loop_filter_delta_update;
+  gboolean loop_filter_delta_enabled;
+  gboolean loop_filter_delta_update;
 
-  guint8 update_ref_deltas[GST_AV1_TOTAL_REFS_PER_FRAME];
+  gboolean update_ref_deltas[GST_AV1_TOTAL_REFS_PER_FRAME];
   guint8 loop_filter_ref_deltas[GST_AV1_TOTAL_REFS_PER_FRAME];
 
   guint8 update_mode_deltas[2]; /* is 2 fixed? */
   guint8 loop_filter_mode_deltas[2];
 
-  guint8 delta_lf_present;
+  gboolean delta_lf_present;
   guint8 delta_lf_res;
   guint8 delta_lf_multi;
 };
@@ -1004,7 +1004,7 @@ struct _GstAV1QuantizationParams {
 
 
 struct _GstAV1SegmenationParams {
-  guint8 segmentation_enabled;
+  gboolean segmentation_enabled;
   guint8 segmentation_update_map;
   guint8 segmentation_temporal_update;
   guint8 segmentation_update_data;
@@ -1053,7 +1053,7 @@ struct _GstAV1SegmenationParams {
  */
 
 struct _GstAV1TileInfo {
-  guint8 uniform_tile_spacing_flag;
+  gboolean uniform_tile_spacing_flag;
   guint8 TileColsLog2;
   guint8 TileCols;
   guint8 TileRowsLog2;
@@ -1109,8 +1109,8 @@ struct _GstAV1LoopRestorationParams {
   guint8 lr_unit_shift;
   guint8 lr_unit_extra_shift;
   guint8 lr_uv_shift;
-  guint8 usesChromaLr;
-  guint8 UsesLr;
+  gboolean usesChromaLr;
+  gboolean UsesLr;
   GstAV1FrameRestorationType FrameRestorationType[GST_AV1_MAX_NUM_PLANES];
   guint32 LoopRestorationSize[GST_AV1_MAX_NUM_PLANES];
 
@@ -1125,9 +1125,9 @@ struct _GstAV1LoopRestorationParams {
  *
  */
 struct _GstAV1GlobalMotionParams {
-  guint8 is_global[GST_AV1_NUM_REF_FRAMES];
-  guint8 is_rot_zoom[GST_AV1_NUM_REF_FRAMES];
-  guint8 is_translation[GST_AV1_NUM_REF_FRAMES];
+  gboolean is_global[GST_AV1_NUM_REF_FRAMES];
+  gboolean is_rot_zoom[GST_AV1_NUM_REF_FRAMES];
+  gboolean is_translation[GST_AV1_NUM_REF_FRAMES];
   GstAV1WarpModelType GmType[GST_AV1_NUM_REF_FRAMES];
   gint32 gm_params[GST_AV1_NUM_REF_FRAMES][6];
 
@@ -1210,9 +1210,9 @@ struct _GstAV1GlobalMotionParams {
 
 
 struct _GstAV1FilmGrainParams {
-  guint8 apply_grain;
+  gboolean apply_grain;
   guint16 grain_seed;
-  guint8 update_grain;
+  gboolean update_grain;
   guint8 film_grain_params_ref_idx;
   guint8 num_y_points;
   guint8 point_y_value[GST_AV1_MAX_NUM_Y_POINTS];
@@ -1237,7 +1237,7 @@ struct _GstAV1FilmGrainParams {
   guint8 cr_mult;
   guint8 cr_luma_mult;
   guint8 cr_offset;
-  guint8 overlap_flag;
+  gboolean overlap_flag;
   guint8 clip_to_restricted_range;
 };
 /**
@@ -1380,46 +1380,46 @@ struct _GstAV1FilmGrainParams {
  */
 
 struct _GstAV1FrameHeaderOBU {
-  guint8 show_existing_frame;
+  gboolean show_existing_frame;
   guint8 frame_to_show_map_idx;
   guint32 frame_presentation_time;
   guint32 tu_presentation_delay;
   guint32 display_frame_id;
   GstAV1FrameType frame_type;
-  guint8 FrameIsIntra;
-  guint8 show_frame;
-  guint8 showable_frame;
-  guint8 error_resilient_mode;
-  guint8 disable_cdf_update;
-  guint8 allow_screen_content_tools;
+  gboolean FrameIsIntra;
+  gboolean show_frame;
+  gboolean showable_frame;
+  gboolean error_resilient_mode;
+  gboolean disable_cdf_update;
+  gboolean allow_screen_content_tools;
   guint8 force_integer_mv;
   guint32 current_frame_id;
-  guint8 frame_size_override_flag;
+  gboolean frame_size_override_flag;
   guint32 order_hint;
   guint8 primary_ref_frame;
   guint8 buffer_removal_time_present_flag;
   guint32 buffer_removal_time[GST_AV1_MAX_OPERATING_POINTS];
   guint8 refresh_frame_flags;
   guint32 ref_order_hint[GST_AV1_NUM_REF_FRAMES];
-  guint8 allow_intrabc;
+  gboolean allow_intrabc;
   guint8 frame_refs_short_signaling;
   guint8 last_frame_idx;
   guint8 gold_frame_idx;
   guint8 ref_frame_idx[GST_AV1_NUM_REF_FRAMES];
   guint32 delta_frame_id_minus_1; /* present in for loop --> check obu.c */
-  guint8 allow_high_precision_mv;
-  guint8 is_motion_mode_switchable;
-  guint8 use_ref_frame_mvs;
-  guint8 disable_frame_end_update_cdf;
-  guint8 allow_warped_motion;
-  guint8 reduced_tx_set;
+  gboolean allow_high_precision_mv;
+  gboolean is_motion_mode_switchable;
+  gboolean use_ref_frame_mvs;
+  gboolean disable_frame_end_update_cdf;
+  gboolean allow_warped_motion;
+  gboolean reduced_tx_set;
   guint16 frame_width_minus_1;
   guint16 frame_height_minus_1;
-  guint8 render_and_frame_size_different;
+  gboolean render_and_frame_size_different;
   guint16 render_width_minus_1;
   guint16 render_height_minus_1;
-  guint8 found_ref;
-  guint8 use_superres;
+  gboolean found_ref;
+  gboolean use_superres;
   guint8 coded_denom;
   guint32 UpscaledWidth;
   guint32 FrameWidth;
@@ -1429,7 +1429,7 @@ struct _GstAV1FrameHeaderOBU {
   guint32 RenderWidth;
   guint32 RenderHeight;
   guint32 SuperresDenom;
-  guint8 is_filter_switchable;
+  gboolean is_filter_switchable;
   GstAV1InterpolationFilter interpolation_filter;
   GstAV1LoopFilterParams loop_filter_params;
   GstAV1QuantizationParams quantization_params;
@@ -1437,17 +1437,17 @@ struct _GstAV1FrameHeaderOBU {
   GstAV1TileInfo tile_info;
   GstAV1CDEFParams cdef_params;
   GstAV1LoopRestorationParams loop_restoration_params;
-  guint8 tx_mode_select;
+  gboolean tx_mode_select;
   GstAV1TXModes TxMode;
-  guint8 skip_mode_present;
-  guint8 reference_select;
+  gboolean skip_mode_present;
+  gboolean reference_select;
   GstAV1GlobalMotionParams global_motion_params;
   GstAV1FilmGrainParams film_grain_params;
   guint32 expectedFrameId[GST_AV1_NUM_REF_FRAMES];
   guint32 OrderHints[GST_AV1_NUM_REF_FRAMES]; /* is guint32 appropiat? */
   guint32 RefFrameSignBias[GST_AV1_NUM_REF_FRAMES]; /* is guint32 appropiat? */
-  guint8 CodedLossless;
-  guint8 AllLossless;
+  gboolean CodedLossless;
+  gboolean AllLossless;
   guint8 LosslessArray[GST_AV1_MAX_SEGMENTS];
   guint8 SegQMLevel[3][GST_AV1_MAX_SEGMENTS];
   guint8 skipModeAllowed;
@@ -1479,7 +1479,7 @@ struct _GstAV1FrameHeaderOBU {
 
 struct _GstAV1ReferenceFrameInfo {
   struct {
-    guint8 RefValid;
+    gboolean RefValid;
     guint32 RefFrameId;
     guint32 RefUpscaledWidth;
     guint32 RefFrameHeight;
@@ -1562,7 +1562,7 @@ struct _GstAV1TileListOBU {
  */
 struct _GstAV1TileGroupOBU {
   guint32 NumTiles;
-  guint8 tile_start_and_end_present_flag;
+  gboolean tile_start_and_end_present_flag;
   guint8 tg_start;
   guint8 tg_end;
   struct {
