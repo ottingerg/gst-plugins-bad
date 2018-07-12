@@ -430,8 +430,8 @@ typedef enum {
 struct _GstAV1OBUHeader {
   GstAV1OBUType obu_type;
   guint8 obu_extention_flag;
-  guint8 obu_has_size_field;
-  guint8 obu_reserved_1bit;
+  gboolean obu_has_size_field;
+  gboolean obu_reserved_1bit;
   guint32 obu_size;
   guint8 obu_temporal_id;
   guint8 obu_spatial_id;
@@ -525,7 +525,7 @@ struct _GstAV1DecoderModelInfo {
 struct _GstAV1TimingInfo {
   guint32 num_units_in_display_tick;
   guint32 time_scale;
-  guint8 equal_picture_interval;
+  gboolean equal_picture_interval;
   guint32 num_ticks_per_picture_minus_1;
 };
 
@@ -557,14 +557,14 @@ struct _GstAV1TimingInfo {
  */
 
 struct _GstAV1ColorConfig {
-  guint8 high_bitdepth;
-  guint8 twelve_bit;
+  gboolean high_bitdepth;
+  gboolean twelve_bit;
   gboolean mono_chrome;
   gboolean color_description_present_flag;
   GstAV1ColorPrimaries color_primaries;
   GstAV1TransferCharacteristics transfer_characteristics;
   GstAV1MatrixCoefficients matrix_coefficients;
-  guint8 color_range;
+  gboolean color_range;
   guint8 subsampling_x;
   guint8 subsampling_y;
   GstAV1ChromaSamplePositions chroma_sample_position;
@@ -652,10 +652,10 @@ struct _GstAV1SequenceHeaderOBU {
   guint8 frame_height_bits_minus_1;
   guint16 max_frame_width_minus_1;
   guint16 max_frame_height_minus_1;
-  guint8 frame_id_numbers_present_flag;
+  gboolean frame_id_numbers_present_flag;
   guint8 delta_frame_id_length_minus_2;
   guint8 additional_frame_id_length_minus_1;
-  guint8 use_128x128_superblock;
+  gboolean use_128x128_superblock;
   gboolean enable_filter_intra;
   gboolean enable_intra_edge_filter;
   gboolean enable_interintra_compound;
@@ -665,9 +665,9 @@ struct _GstAV1SequenceHeaderOBU {
   gboolean enable_order_hint;
   gboolean enable_jnt_comp;
   gboolean enable_ref_frame_mvs;
-  guint8 seq_choose_screen_content_tools;
+  gboolean seq_choose_screen_content_tools;
   guint8 seq_force_screen_content_tools;
-  guint8 seq_choose_integer_mv;
+  gboolean seq_choose_integer_mv;
   guint8 seq_force_integer_mv;
   guint8 order_hint_bits_minus_1;
 
@@ -795,9 +795,9 @@ struct _GstAV1MetadataHdrMdcv {
 struct _GstAV1MetadataScalability {
   GstAV1ScalabilityModes scalability_mode_idc;
   guint8 spatial_layers_cnt_minus_1;
-  guint8 spatial_layer_dimensions_present_flag;
-  guint8 spatial_layer_description_present_flag;
-  guint8 temporal_group_description_present_flag;
+  gboolean spatial_layer_dimensions_present_flag;
+  gboolean spatial_layer_description_present_flag;
+  gboolean temporal_group_description_present_flag;
   guint8 scalability_structure_reserved_3bits;
   guint16 spatial_layer_max_width[GST_AV1_MAX_SPATIAL_LAYERS];
   guint16 spatial_layer_max_height[GST_AV1_MAX_SPATIAL_LAYERS];
@@ -967,16 +967,16 @@ struct _GstAV1LoopFilterParams {
 struct _GstAV1QuantizationParams {
   guint8 base_q_idx;
   gint8 DeltaQYDc;
-  guint8 diff_uv_delta;
+  gboolean diff_uv_delta;
   gint8 DeltaQUDc;
   gint8 DeltaQUAc;
   gint8 DeltaQVDc;
   gint8 DeltaQVAc;
-  guint8 using_qmatrix;
+  gboolean using_qmatrix;
   guint8 qm_y;
   guint8 qm_u;
   guint8 qm_v;
-  guint8 delta_q_present;
+  gboolean delta_q_present;
   guint8 delta_q_res;
 };
 
@@ -1009,7 +1009,7 @@ struct _GstAV1SegmenationParams {
   guint8 segmentation_update_map;
   guint8 segmentation_temporal_update;
   guint8 segmentation_update_data;
-  gint8 FeatureEnabled[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
+  gboolean FeatureEnabled[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
   gint16 FeatureData[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
   guint8 SegIdPreSkip;
   guint8 LastActiveSegId;
@@ -1107,9 +1107,9 @@ struct _GstAV1CDEFParams {
  */
 
 struct _GstAV1LoopRestorationParams {
-  guint8 lr_unit_shift;
-  guint8 lr_unit_extra_shift;
-  guint8 lr_uv_shift;
+  gboolean lr_unit_shift;
+  gboolean lr_unit_extra_shift;
+  gboolean lr_uv_shift;
   gboolean usesChromaLr;
   gboolean UsesLr;
   GstAV1FrameRestorationType FrameRestorationType[GST_AV1_MAX_NUM_PLANES];
@@ -1239,7 +1239,7 @@ struct _GstAV1FilmGrainParams {
   guint8 cr_luma_mult;
   guint8 cr_offset;
   gboolean overlap_flag;
-  guint8 clip_to_restricted_range;
+  gboolean clip_to_restricted_range;
 };
 /**
  * _GstAV1FrameHeaderOBU:
@@ -1393,17 +1393,17 @@ struct _GstAV1FrameHeaderOBU {
   gboolean error_resilient_mode;
   gboolean disable_cdf_update;
   gboolean allow_screen_content_tools;
-  guint8 force_integer_mv;
+  gboolean force_integer_mv;
   guint32 current_frame_id;
   gboolean frame_size_override_flag;
   guint32 order_hint;
   guint8 primary_ref_frame;
-  guint8 buffer_removal_time_present_flag;
+  gboolean buffer_removal_time_present_flag;
   guint32 buffer_removal_time[GST_AV1_MAX_OPERATING_POINTS];
   guint8 refresh_frame_flags;
   guint32 ref_order_hint[GST_AV1_NUM_REF_FRAMES];
   gboolean allow_intrabc;
-  guint8 frame_refs_short_signaling;
+  gboolean frame_refs_short_signaling;
   guint8 last_frame_idx;
   guint8 gold_frame_idx;
   guint8 ref_frame_idx[GST_AV1_NUM_REF_FRAMES];
@@ -1451,7 +1451,7 @@ struct _GstAV1FrameHeaderOBU {
   gboolean AllLossless;
   guint8 LosslessArray[GST_AV1_MAX_SEGMENTS];
   guint8 SegQMLevel[3][GST_AV1_MAX_SEGMENTS];
-  guint8 skipModeAllowed;
+  gboolean skipModeAllowed;
   guint8 SkipModeFrame[2]; /* is 2 appropiat? */
 
 
