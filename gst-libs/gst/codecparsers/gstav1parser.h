@@ -887,12 +887,13 @@ struct _GstAV1MetadataTimecode {
 
 struct _GstAV1MetadataOBU {
   GstAV1MetadataType metadata_type;
-
-  GstAV1MetadataITUT_T35 itut_t35;
-  GstAV1MetadataHdrCll hdr_cll;
-  GstAV1MetadataHdrMdcv hdr_mdcv;
-  GstAV1MetadataScalability scalability;
-  GstAV1MetadataTimecode timecode;
+  union {
+    GstAV1MetadataITUT_T35 itut_t35;
+    GstAV1MetadataHdrCll hdr_cll;
+    GstAV1MetadataHdrMdcv hdr_mdcv;
+    GstAV1MetadataScalability scalability;
+    GstAV1MetadataTimecode timecode;
+  };
 };
 
 /**
