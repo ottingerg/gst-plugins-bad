@@ -96,6 +96,7 @@ G_BEGIN_DECLS
 typedef struct _GstAV1Parser GstAV1Parser;
 
 typedef struct _GstAV1OBUHeader GstAV1OBUHeader;
+typedef struct _GstAV1OBUHeaderExtention GstAV1OBUHeaderExtention;
 
 typedef struct _GstAV1SequenceHeaderOBU GstAV1SequenceHeaderOBU;
 typedef struct _GstAV1MetadataOBU GstAV1MetadataOBU;
@@ -136,6 +137,7 @@ typedef enum {
   GST_AV1_PARSER_SKIPBITS_ERROR = 3,
   GST_AV1_PARSER_BITSTREAM_ERROR = 4,
   GST_AV1_PARSER_MISSING_OBU_REFERENCE = 5,
+  GST_AV1_ALLOCATION_ERROR = 6
 } GstAV1ParserResult;
 
 /**
@@ -411,20 +413,31 @@ typedef enum {
   GST_AV1_WARP_MODEL_AFFINE = 3,
 } GstAV1WarpModelType;
 
-
 /**
- * _GstAV1OBUHeader:
+ * GstAV1OBUHeaderExtention:
  *
- * @obu_forbidden_bit: must be set to 0.
- * @obu_type specifies: the type of data structure contained in the OBU payload.
- * @obu_has_size_field: equal to 1 indicates that the obu_size syntax element will be present.
- *                      obu_has_size_field equal to 0 indicates that the obu_size syntax element will not be present.
- * @obu_reserved_1bit: must be set to 0. The value is ignored by a decoder.
- * @obu_size: contains the size in bytes of the OBU not including the bytes within obu_header
- *            or the obu_size syntax element.
  * @temporal_id: specifies the temporal level of the data contained in the OBU.
  * @spatial_id: specifies the spatial level of the data contained in the OBU.
  * @extension_header_reserved_3bits must be set to 0. The value is ignored by a decoder.
+ *
+ */
+
+struct _GstAV1OBUHeaderExtention {
+  guint8 obu_temporal_id;
+  guint8 obu_spatial_id;
+  guint8 obu_extension_header_reserved_3bits;
+};
+
+
+/**
+ * GstAV1OBUHeader:
+ *
+ * @type specifies: the type of data structure contained in the OBU payload.
+ * @has_size_field: equal to 1 indicates that the obu_size syntax element will be present.
+ *                      obu_has_size_field equal to 0 indicates that the obu_size syntax element will not be present.
+ * @reserved_1bit: must be set to 0. The value is ignored by a decoder.
+ * @size: contains the size in bytes of the OBU not including the bytes within obu_header
+ *            or the obu_size syntax element.
  *
  */
 
@@ -434,14 +447,14 @@ struct _GstAV1OBUHeader {
   gboolean obu_has_size_field;
   gboolean obu_reserved_1bit;
   guint32 obu_size;
-  guint8 obu_temporal_id;
-  guint8 obu_spatial_id;
-  guint8 obu_extension_header_reserved_3bits;
+  GstAV1OBUHeaderExtention extention;
 };
 
 
+
+
 /**
- * _GstAV1OperatingPoint:
+ * GstAV1OperatingPoint:
  *
  * @seq_level_idx: specifies the level that the coded video sequence conforms to.
  * @seq_tier: specifies the tier that the coded video sequence conforms to.
@@ -469,7 +482,7 @@ struct _GstAV1OBUHeader {
  *                                             is specified for this operating. 0 indicates that
  *                                             initial_display_delay_minus_1 is not specified for this
  *                                             operating point.
- * initial_display_delay_minus_1: plus 1 specifies, for operating point i, the number of decoded frames
+ * @initial_display_delay_minus_1: plus 1 specifies, for operating point i, the number of decoded frames
  *                                that should be present in the buffer pool before the first presentable
  *                                frame is displayed. This will ensure that all presentable frames in the
  *                                sequence can be decoded at or before the time that they are scheduled
@@ -490,7 +503,7 @@ struct _GstAV1OperatingPoint {
 
 
 /**
- * _GstAV1DecoderModelInfo:
+ * GstAV1DecoderModelInfo:
  * @bitrate_scale, buffer_size_scale, encoder_decoder_buffer_delay_length_minus_1, num_units_in_decoding_tick,
  *  buffer_removal_delay_length_minus_1, and frame_presentation_delay_length_minus_1: These are syntax elements used
  *  by the decoder model. They do not affect the decoding process.
@@ -504,7 +517,7 @@ struct _GstAV1DecoderModelInfo {
 };
 
 /**
- * _GstAV1TimingInfo:
+ * GstAV1TimingInfo:
  *
  * @num_units_in_display_tick: is the number of time units of a clock operating at the frequency time_scale Hz that
  *                             corresponds to one increment of a clock tick counter. A clock tick, in seconds, is
@@ -531,7 +544,7 @@ struct _GstAV1TimingInfo {
 };
 
 /**
- * _GstAV1ColorConfig:
+ * GstAV1ColorConfig:
  *
  * @high_bitdepth and twelve_bit: are syntax elements which, together with seq_profile, determine the bit depth.
  * @mono_chrome: equal to 1 indicates that the video does not contain U and V color planes. mono_chrome equal to 0
@@ -553,8 +566,8 @@ struct _GstAV1TimingInfo {
  * @separate_uv_delta_q: equal to 1 indicates that the U and V planes may have separate delta quantizer values. separate_uv_delta_q
  *                      equal to 0 indicates that the U and V planes will share the same delta quantizer value.
  *
- * @BitDepth: BitDepth
- * @NumPlanes: Number of planes
+ * @bit_depth: bit_depth
+ * @num_planes: Number of planes
  */
 
 struct _GstAV1ColorConfig {
@@ -570,12 +583,13 @@ struct _GstAV1ColorConfig {
   guint8 subsampling_y;
   GstAV1ChromaSamplePositions chroma_sample_position;
   gboolean separate_uv_delta_q;
-  guint8 BitDepth;
-  guint8 NumPlanes;
+  guint8 bit_depth;
+  guint8 num_planes;
 };
 
 /**
- * _GstAV1SequenceHeaderOBU:
+ * GstAV1SequenceHeaderOBU:
+ *
  * @seq_profile: specifies the features that can be used in the coded video sequence
  * @still_picture: equal to 1 specifies that the bitstream contains only one coded frame.
  * @reduced_still_picture_header: specifies that the syntax elements not needed by a still picture are omitted
@@ -693,7 +707,7 @@ struct _GstAV1SequenceHeaderOBU {
 };
 
 /**
- * _GstAV1MetadataITUT_T35:
+ * GstAV1MetadataITUT_T35:
  *
  * @itu_t_t35_country_code: shall be a byte having a value specified as a country code by Annex A of Recommendation ITU-T T.35.
  * @itu_t_t35_country_code_extension_byte: shall be a byte having a value specified as a country code by Annex B of
@@ -703,11 +717,11 @@ struct _GstAV1SequenceHeaderOBU {
 struct _GstAV1MetadataITUT_T35 {
   guint8 itu_t_t35_country_code;
   guint8 itu_t_t35_country_code_extention_byte;
-  /* itu_t_t35_payload_bytes - not supported at the moment */
+  guint8 itu_t_t35_payload_bytes[GST_PADDING_LARGE]; /* should be used for ITU-T T.35 terminal provider code - size unclear*/
 };
 
 /**
- * _GstAV1MetadataHdrCll:
+ * GstAV1MetadataHdrCll:
  * high dynamic range content light level syntax metadata
  *
  * @max_cll: specifies the maximum content light level as specified in CEA-861.3, Appendix A.
@@ -721,7 +735,7 @@ struct _GstAV1MetadataHdrCll {
 };
 
 /**
- * _GstAV1MetadataHdrCll:
+ * GstAV1MetadataHdrCll:
  * high dynamic range mastering display color volume metadata
  *
  * @primary_chromaticity_x[]: specifies a 0.16 fixed-point X chromaticity coordinate as defined by CIE 1931, where i =
@@ -744,7 +758,7 @@ struct _GstAV1MetadataHdrMdcv {
 };
 
 /**
- * _GstAV1MetadataScalability:
+ * GstAV1MetadataScalability:
  * high dynamic range mastering display color volume metadata
  *
  * @scalability_mode_idc: indicates the picture prediction structure of the bitstream.
@@ -814,7 +828,7 @@ struct _GstAV1MetadataScalability {
 
 
 /**
- * _GstAV1MetadataTimecode:
+ * GstAV1MetadataTimecode:
  * high dynamic range mastering display color volume metadata
  *
  * @counting_type: specifies the method of dropping values of the n_frames syntax element as specified in AV1 Spec 6.1.1.
@@ -876,7 +890,7 @@ struct _GstAV1MetadataTimecode {
 };
 
 /**
- * _GstAV1MetadataOBU:
+ * GstAV1MetadataOBU:
  *
  * @metadata_type: type of metadata
  * @itut_t35: ITUT T35 metadata
@@ -898,7 +912,7 @@ struct _GstAV1MetadataOBU {
 };
 
 /**
- * _GstAV1LoopFilterParams:
+ * GstAV1LoopFilterParams:
  *
  * @loop_filter_level[]: is an array containing loop filter strength values. Different loop filter strength values
  *                       from the array are used depending on the image plane being filtered, and the edge direction
@@ -947,16 +961,16 @@ struct _GstAV1LoopFilterParams {
 };
 
 /**
- * _GstAV1QuantizationParams:
+ * GstAV1QuantizationParams:
  *
  * @base_q_idx: indicates the base frame qindex. This is used for Y AC coefficients and as the base value for
  *              the other quantizers.
- * @DeltaQYDc: indicates the Y DC quantizer relative to base_q_idx.
+ * @delta_q_ydc: indicates the Y DC quantizer relative to base_q_idx.
  * @diff_uv_delta: equal to 1 indicates that the U and V delta quantizer values are coded separately. diff_uv_delta
  *                 equal to 0 indicates that the U and V delta quantizer values share a common value.
- * @DeltaQUDc: indicates the U DC quantizer relative to base_q_idx.
- * @DeltaQUAc: indicates the U AC quantizer relative to base_q_idx.
- * @DeltaQVAc: indicates the V AC quantizer relative to base_q_idx.
+ * @delta_q_udc: indicates the U DC quantizer relative to base_q_idx.
+ * @delta_q_uac: indicates the U AC quantizer relative to base_q_idx.
+ * @delta_q_vac: indicates the V AC quantizer relative to base_q_idx.
  * @using_qmatrix: specifies that the quantizer matrix will be used to compute quantizers.
  * @qm_y: specifies the level in the quantizer matrix that should be used for luma plane decoding.
  * @qm_u: specifies the level in the quantizer matrix that should be used for chroma U plane decoding.
@@ -967,12 +981,12 @@ struct _GstAV1LoopFilterParams {
  */
 struct _GstAV1QuantizationParams {
   guint8 base_q_idx;
-  gint8 DeltaQYDc;
+  gint8 delta_q_ydc;
   gboolean diff_uv_delta;
-  gint8 DeltaQUDc;
-  gint8 DeltaQUAc;
-  gint8 DeltaQVDc;
-  gint8 DeltaQVAc;
+  gint8 delta_q_udc;
+  gint8 delta_q_uac;
+  gint8 delta_q_vdc;
+  gint8 delta_q_vac;
   gboolean using_qmatrix;
   guint8 qm_y;
   guint8 qm_u;
@@ -982,7 +996,7 @@ struct _GstAV1QuantizationParams {
 };
 
 /**
- * _GstAV1SegmenationParams:
+ * GstAV1SegmenationParams:
  *
  * @segmentation_enabled: equal to 1 indicates that this frame makes use of the segmentation tool;
  *                        segmentation_enabled equal to 0 indicates that the frame does not use segmentation.
@@ -995,12 +1009,12 @@ struct _GstAV1QuantizationParams {
  * @segmentation_update_data: equal to 1 indicates that new parameters are about to be specified for each segment.
  *                            segmentation_update_data equal to 0 indicates that the segmentation parameters should keep
  *                            their existing values.
- * @FeatureEnabled[]: equal to 0 indicates that the corresponding feature is unused and has value equal to 0.
- *                    FeatureEnabled[] equal to 1 indicates that the feature value is coded in the bitstream.
- * @FeatureData[]: specifies the feature data for a segment feature.
- * @SegIdPreSkip: equal to 1 indicates that the segment id will be read before the skip syntax element. SegIdPreSkip
+ * @feature_enabled[]: equal to 0 indicates that the corresponding feature is unused and has value equal to 0.
+ *                    feature_enabled[] equal to 1 indicates that the feature value is coded in the bitstream.
+ * @feature_data[]: specifies the feature data for a segment feature.
+ * @seg_id_preskip: equal to 1 indicates that the segment id will be read before the skip syntax element. seg_id_preskip
  *                equal to 0 indicates that the skip syntax element will be read first.
- * @LastActiveSegId: indicates the highest numbered segment id that has some enabled feature. This is used when decoding
+ * @last_active_seg_id: indicates the highest numbered segment id that has some enabled feature. This is used when decoding
  *                   the segment id to only decode choices corresponding to used segments.
  */
 
@@ -1010,22 +1024,19 @@ struct _GstAV1SegmenationParams {
   guint8 segmentation_update_map;
   guint8 segmentation_temporal_update;
   guint8 segmentation_update_data;
-  gboolean FeatureEnabled[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
-  gint16 FeatureData[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
-  guint8 SegIdPreSkip;
-  guint8 LastActiveSegId;
+  gboolean feature_enabled[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
+  gint16 feature_data[GST_AV1_MAX_SEGMENTS][GST_AV1_SEG_LVL_MAX];
+  guint8 seg_id_preskip;
+  guint8 last_active_seg_id;
 };
 
 
 /**
- * _GstAV1TileInfo:
- * @uniform_tile_spacing_flag: equal to 1 means that the tiles are uniformly spaced across the frame. (In other words, all
- *                             tiles are the same size except for the ones at the right and bottom edge which can be smaller.)
- *                             uniform_tile_spacing_flag equal to 0 means that the tile sizes are coded.
- * @TileColsLog2: specifies the base 2 logarithm of the desired number of tiles across the frame.
- * @TileCols: specifies the number of tiles across the frame. It is a requirement of bitstream conformance that TileCols is
+ * GstAV1TileInfo:
+ * @tile_cols_log2: specifies the base 2 logarithm of the desired number of tiles across the frame.
+ * @tile_cols: specifies the number of tiles across the frame. It is a requirement of bitstream conformance that TileCols is
  *            less than or equal to MAX_TILE_COLS.
- * @TileRowsLog2: specifies the base 2 logarithm of the desired number of tiles down the frame.
+ * @tile_rows_log2: specifies the base 2 logarithm of the desired number of tiles down the frame.
  * @TileRows: specifies the number of tiles down the frame. It is a requirement of bitstream conformance that TileRows is
  *            less than or equal to MAX_TILE_ROWS.
  */
@@ -1037,45 +1048,43 @@ struct _GstAV1SegmenationParams {
  * @height_in_sbs_minus_1[]: specifies the height of a tile minus 1 in units of superblocks.
  * @tileHeightSb[]: is used to specify the height of each tile in units of superblocks. It is a requirement of bitstream conformance
  *                   that tileWidthSb * tileHeightSb is less than maxTileAreaSb.
- * @tile_size_bytes_minus_1: is used to compute TileSizeBytes
+ * @tile_size_bytes_minus_1: is used to compute tile_size_bytes
  */
 
 /*
- * @MiColStarts[]: is an array specifying the start column (in units of 4x4 luma samples) for each tile across the image.
+ * @mi_col_starts[]: is an array specifying the start column (in units of 4x4 luma samples) for each tile across the image.
  *                 If uniform_tile_spacing_flag is equal to 0, it is a requirement of bitstream conformance that startSb is equal
- *                 to sbCols when the loop writing MiColStarts exits.
- * @MiRowStarts[]: is an array specifying the start row (in units of 4x4 luma samples) for each tile down the image.
+ *                 to sbCols when the loop writing mi_col_starts exits.
+ * @mi_row_starts[]: is an array specifying the start row (in units of 4x4 luma samples) for each tile down the image.
  *                 If uniform_tile_spacing_flag is equal to 0, it is a requirement of bitstream conformance that startSb is equal
- *                 to sbRows when the loop writing MiRowStarts exits.
+ *                 to sbRows when the loop writing mi_row_starts exits.
  * @maxTileHeightSb: specifies the maximum height (in units of superblocks) that can be used for a tile (to avoid making tiles
  *                   with too much area).
  * @context_update_tile_id: specifies which tile to use for the CDF update.
- * @TileSizeBytes specifies the number of bytes needed to code each tile size.
+ * @tile_size_bytes specifies the number of bytes needed to code each tile size.
  *
  */
 
 struct _GstAV1TileInfo {
-  gboolean uniform_tile_spacing_flag;
-  guint8 TileColsLog2;
-  guint8 TileCols;
-  guint8 TileRowsLog2;
-  guint8 TileRows;
+  guint8 tile_cols_log2;
+  guint8 tile_cols;
+  guint8 tile_rows_log2;
+  guint8 tile_rows;
   /*
   guint32 width_in_sbs_minus_1[GST_AV1_MAX_TILE_COUNT;
   guint32 tileWidthSb[GST_AV1_MAX_TILE_COUNT];
   guint32 height_in_sbs_minus_1[GST_AV1_MAX_TILE_COUNT];
   guint32 tileHeightSb[GST_AV1_MAX_TILE_COUNT];
   */
-  guint32 MiColStarts[GST_AV1_MAX_TILE_COUNT];
-  guint32 MiRowStarts[GST_AV1_MAX_TILE_COUNT];
-  guint8 maxTileHeightSb;
-  guint8 context_update_tile_id;
+  guint32 mi_col_starts[GST_AV1_MAX_TILE_COUNT];
+  guint32 mi_row_starts[GST_AV1_MAX_TILE_COUNT];
+  guint16 context_update_tile_id;
   /*guint8 tile_size_bytes_minus_1; */
-  guint8 TileSizeBytes;
+  guint8 tile_size_bytes;
 };
 
 /**
- * _GstAV1CDEFParams:
+ * GstAV1CDEFParams:
  * @cdef_damping_minus_3 controls the amount of damping in the deringing filter.
  * @cdef_bits specifies the number of bits needed to specify which CDEF filter to apply.
  * @cdef_y_pri_strength: specify the strength of the primary filter (Y component)
@@ -1095,15 +1104,15 @@ struct _GstAV1CDEFParams {
 };
 
 /**
- * _GstAV1LoopRestorationParams:
+ * GstAV1LoopRestorationParams:
  *
  * @lr_unit_shift: specifies if the luma restoration size should be halved.
  * @lr_unit_extra_shift: specifies if the luma restoration size should be halved again.
  * @lr_uv_shift: is only present for 4:2:0 formats and specifies if the chroma size should be half the luma size.
- * @UsesLr: indicates if any plane uses loop restoration.
- * @usesChromaLr: indicates if chroma plane(s) use loop restoration.
- * @FrameRestorationType[]: specifies the type of restoration used for each plane.
- * @LoopRestorationSize[]: specifies the size of loop restoration units in units of samples in the current plane.
+ * @uses_lr: indicates if any plane uses loop restoration.
+ * @uses_chroma_lr: indicates if chroma plane(s) use loop restoration.
+ * @frame_restoration_type[]: specifies the type of restoration used for each plane.
+ * @loop_restoration_size[]: specifies the size of loop restoration units in units of samples in the current plane.
  *
  */
 
@@ -1111,15 +1120,15 @@ struct _GstAV1LoopRestorationParams {
   gboolean lr_unit_shift;
   gboolean lr_unit_extra_shift;
   gboolean lr_uv_shift;
-  gboolean usesChromaLr;
-  gboolean UsesLr;
-  GstAV1FrameRestorationType FrameRestorationType[GST_AV1_MAX_NUM_PLANES];
-  guint32 LoopRestorationSize[GST_AV1_MAX_NUM_PLANES];
+  gboolean uses_chroma_lr;
+  gboolean uses_lr;
+  GstAV1FrameRestorationType frame_restoration_type[GST_AV1_MAX_NUM_PLANES];
+  guint32 loop_restoration_size[GST_AV1_MAX_NUM_PLANES];
 
 };
 
 /**
- * _GstAV1GlobalMotionParams:
+ * GstAV1GlobalMotionParams:
  *
  * @is_global: specifies whether global motion parameters are present for a particular reference frame.
  * @is_rot_zoom: specifies whether a particular reference frame uses rotation and zoom global motion.
@@ -1130,13 +1139,13 @@ struct _GstAV1GlobalMotionParams {
   gboolean is_global[GST_AV1_NUM_REF_FRAMES];
   gboolean is_rot_zoom[GST_AV1_NUM_REF_FRAMES];
   gboolean is_translation[GST_AV1_NUM_REF_FRAMES];
-  GstAV1WarpModelType GmType[GST_AV1_NUM_REF_FRAMES];
+  GstAV1WarpModelType gm_type[GST_AV1_NUM_REF_FRAMES];
   gint32 gm_params[GST_AV1_NUM_REF_FRAMES][6];
 
 };
 
 /**
- * _GstAV1FilmGrainParams:
+ * GstAV1FilmGrainParams:
  *
  * @apply_grain: equal to 1 specifies that film grain should be added to this frame. apply_grain equal to 0
  *               specifies that film grain should not be added.
@@ -1243,7 +1252,7 @@ struct _GstAV1FilmGrainParams {
   gboolean clip_to_restricted_range;
 };
 /**
- * _GstAV1FrameHeaderOBU:
+ * GstAV1FrameHeaderOBU:
  *
  * @show_existing_frame: equal to 1, indicates the frame indexed by frame_to_show_map_idx is to be output;
  *                       show_existing_frame equal to 0 indicates that further processing is required.
@@ -1257,13 +1266,13 @@ struct _GstAV1FilmGrainParams {
  *                           of a modulo 1 << (frame_presentation_time_length_minus_1 + 1) counter.
  * @tu_presentation_delay: is a syntax element used by the decoder model. It does not affect the decoding process.
  * @display_frame_id provides: the frame id number for the frame to output. It is a requirement of bitstream conformance
- *                             that whenever display_frame_id is read, the value matches RefFrameId[ frame_to_show_map_idx ]
+ *                             that whenever display_frame_id is read, the value matches ref_frame_id[ frame_to_show_map_idx ]
  *                             (the value of current_frame_id at the time that the frame indexed by frame_to_show_map_idx was
- *                             stored), and that RefValid[ frame_to_show_map_idx ] is equal to 1.
+ *                             stored), and that ref_valid[ frame_to_show_map_idx ] is equal to 1.
  *                             It is a requirement of bitstream conformance that the number of bits needed to read
  *                             display_frame_id does not exceed 16. This is equivalent to the constraint that idLen <= 16
  * @frame_type: specifies the type of the frame.
- * @FrameIsIntra: 0 indicates that this frame may use inter prediction), the requirements described in the frame size with
+ * @frame_is_intra: 0 indicates that this frame may use inter prediction), the requirements described in the frame size with
  *                refs semantics of section 6.7.5 must also be satisfied.
  * @show_frame: equal to 1 specifies that this frame should be immediately output once decoded. show_frame equal to 0
  *              specifies that this frame should not be immediately output. (It may be output later if a later uncompressed
@@ -1342,15 +1351,15 @@ struct _GstAV1FilmGrainParams {
  * @use_superres: equal to 0 indicates that no upscaling is needed. use_superres equal to 1 indicates that upscaling is
  *                needed.
  * @coded_denom: is used to compute the amount of upscaling.
- * @SuperresDenom: is the denominator of a fraction that specifies the ratio between the superblock width before and after
+ * @superres_denom: is the denominator of a fraction that specifies the ratio between the superblock width before and after
  *                 upscaling. The numerator of this fraction is equal to the constant SUPERRES_NUM.
- * @MiCols: is the number of 4x4 block columns in the frame.
- * @MiRows: is the number of 4x4 block rows in the frame.
- * @FrameWidth:
- * @FrameHeight:
- * @RenderWidth:
- * @RenderHeight:
- * @UpscaledWidth:
+ * @mi_cols: is the number of 4x4 block columns in the frame.
+ * @mi_rows: is the number of 4x4 block rows in the frame.
+ * @frame_width:
+ * @frame_height:
+ * @render_width:
+ * @render_height:
+ * @upscaled_width:
  * @is_filter_switchable: equal to 1 indicates that the filter selection is signaled at the block level;
  *                         is_filter_switchable equal to 0 indicates that the filter selection is signaled at the
  *                        frame level.
@@ -1360,25 +1369,25 @@ struct _GstAV1FilmGrainParams {
  * @reference_select: equal to 1 specifies that the mode info for inter blocks contains the syntax element comp_mode that
  *                    indicates whether to use single or compound reference prediction. Reference_select equal to 0
  *                    specifies that all interblocks will use single prediction.
- * @expectedFrameId[]: specifies the frame id for each frame used for reference. It is a requirement of bitstream conformance
- *                     that whenever expectedFrameId[ i ] is calculated, the value matches RefFrameId[ ref_frame_idx[ i ] ]
+ * @expected_frame_id[]: specifies the frame id for each frame used for reference. It is a requirement of bitstream conformance
+ *                     that whenever expected_frame_id[ i ] is calculated, the value matches ref_frame_id[ ref_frame_idx[ i ] ]
  *                     (this contains the value of current_frame_id at the time that the frame indexed by ref_frame_idx was stored).
 
- * @OrderHints[]: specifies the expected output order for each reference frame.
- * @RefFrameSignBias[]: specifies the intended direction of the motion vector in time for each reference frame. A sign bias
+ * @order_hints[]: specifies the expected output order for each reference frame.
+ * @ref_frame_sign_bias[]: specifies the intended direction of the motion vector in time for each reference frame. A sign bias
  *                      equal to 0 indicates that the reference frame is a forwards reference (i.e. the reference frame is expected
  *                      to be output before the current frame); a sign bias equal to 1 indicates that the reference frame is a backwards
  *                      reference.
- * @CodedLossless: is a variable that is equal to 1 when all segments use lossless encoding. This indicates that the frame is
- *                 fully lossless at the coded resolution of FrameWidth by FrameHeight. In this case, the loop filter and CDEF filter
+ * @coded_lossless: is a variable that is equal to 1 when all segments use lossless encoding. This indicates that the frame is
+ *                 fully lossless at the coded resolution of frame_width by frame_height. In this case, the loop filter and CDEF filter
  *                 are disabled.
- * @AllLossless: is a variable that is equal to 1 when CodedLossless is equal to 1 and FrameWidth is equal to UpscaledWidth.
+ * @all_lossless: is a variable that is equal to 1 when coded_lossless is equal to 1 and frame_width is equal to upscaled_width.
  *               This indicates that the frame is fully lossless at the upscaled resolution. In this case, the loop filter, CDEF filter, and
  *               loop restoration are disabled.
  * @LossLessArray:
- * @SegQMLevel:
- * @skipModeAllowed:
- * @SkipModeFrame[]: specifies the frames to use for compound prediction when skip_mode is equal to 1.
+ * @seg_qm_level:
+ * @skip_mode_allowed:
+ * @skip_mode_frame[]: specifies the frames to use for compound prediction when skip_mode is equal to 1.
  */
 
 struct _GstAV1FrameHeaderOBU {
@@ -1388,7 +1397,7 @@ struct _GstAV1FrameHeaderOBU {
   guint32 tu_presentation_delay;
   guint32 display_frame_id;
   GstAV1FrameType frame_type;
-  gboolean FrameIsIntra;
+  gboolean frame_is_intra;
   gboolean show_frame;
   gboolean showable_frame;
   gboolean error_resilient_mode;
@@ -1423,14 +1432,14 @@ struct _GstAV1FrameHeaderOBU {
   gboolean found_ref;
   gboolean use_superres;
   guint8 coded_denom;
-  guint32 UpscaledWidth;
-  guint32 FrameWidth;
-  guint32 FrameHeight;
-  guint32 MiCols;
-  guint32 MiRows;
-  guint32 RenderWidth;
-  guint32 RenderHeight;
-  guint32 SuperresDenom;
+  guint32 upscaled_width;
+  guint32 frame_width;
+  guint32 frame_height;
+  guint32 mi_cols;
+  guint32 mi_rows;
+  guint32 render_width;
+  guint32 render_height;
+  guint32 superres_denom;
   gboolean is_filter_switchable;
   GstAV1InterpolationFilter interpolation_filter;
   GstAV1LoopFilterParams loop_filter_params;
@@ -1440,67 +1449,67 @@ struct _GstAV1FrameHeaderOBU {
   GstAV1CDEFParams cdef_params;
   GstAV1LoopRestorationParams loop_restoration_params;
   gboolean tx_mode_select;
-  GstAV1TXModes TxMode;
+  GstAV1TXModes tx_mode;
   gboolean skip_mode_present;
   gboolean reference_select;
   GstAV1GlobalMotionParams global_motion_params;
   GstAV1FilmGrainParams film_grain_params;
-  guint32 expectedFrameId[GST_AV1_NUM_REF_FRAMES];
-  guint32 OrderHints[GST_AV1_NUM_REF_FRAMES]; /* is guint32 appropiat? */
-  guint32 RefFrameSignBias[GST_AV1_NUM_REF_FRAMES]; /* is guint32 appropiat? */
-  gboolean CodedLossless;
-  gboolean AllLossless;
-  guint8 LosslessArray[GST_AV1_MAX_SEGMENTS];
-  guint8 SegQMLevel[3][GST_AV1_MAX_SEGMENTS];
-  gboolean skipModeAllowed;
-  guint8 SkipModeFrame[2]; /* is 2 appropiat? */
+  guint32 expected_frame_id[GST_AV1_NUM_REF_FRAMES];
+  guint32 order_hints[GST_AV1_NUM_REF_FRAMES]; /* is guint32 appropiat? */
+  guint32 ref_frame_sign_bias[GST_AV1_NUM_REF_FRAMES]; /* is guint32 appropiat? */
+  gboolean coded_lossless;
+  gboolean all_lossless;
+  guint8 lossless_array[GST_AV1_MAX_SEGMENTS];
+  guint8 seg_qm_level[3][GST_AV1_MAX_SEGMENTS];
+  gboolean skip_mode_allowed;
+  guint8 skip_mode_frame[2]; /* is 2 appropiat? */
 
 
 };
 
 /**
- * _GstAV1ReferenceFrameInfo:
+ * GstAV1ReferenceFrameInfo:
  *
- * @RefValid:
- * @RefFrameId:
- * @RefUpscaledWidth:
- * @RefFrameHeight:
- * @RefFrameWidth:
- * @RefRenderHeight:
- * @RefRenderWidth:
- * @RefFrameType:
- * @RefOrderHint:
- * @RefMiCols;
- * @RefMiRows;
- * @RefBitDepth;
- * @RefSubsamplingX;
- * @RefSubsamplingY;
+ * @ref_valid:
+ * @ref_frame_id:
+ * @ref_frame_type:
+ * @ref_upscaled_width:
+ * @ref_frame_height:
+ * @ref_frame_width:
+ * @ref_render_height:
+ * @ref_render_width:
+ * @ref_order_hint:
+ * @ref_mi_cols;
+ * @ref_mi_rows;
+ * @ref_bit_depth;
+ * @ref_subsampling_x;
+ * @ref_subsampling_y;
  *
  * Note: The Reference Info is only partly implemented - check chapter 7.20 and 7.21 of Spec
  */
 
 struct _GstAV1ReferenceFrameInfo {
   struct {
-    gboolean RefValid;
-    guint32 RefFrameId;
-    guint32 RefUpscaledWidth;
-    guint32 RefFrameHeight;
-    guint32 RefFrameWidth;
-    guint32 RefRenderHeight;
-    guint32 RefRenderWidth;
-    GstAV1FrameType RefFrameType;
-    guint32 RefOrderHint; /* is guint32 appropiat? */
-    guint32 RefMiCols;
-    guint32 RefMiRows;
-    guint8 RefBitDepth;
-    guint8 RefSubsamplingX;
-    guint8 RefSubsamplingY;
+    gboolean ref_valid;
+    guint32 ref_frame_id;
+    GstAV1FrameType ref_frame_type;
+    guint32 ref_upscaled_width;
+    guint32 ref_frame_height;
+    guint32 ref_frame_width;
+    guint32 ref_render_height;
+    guint32 ref_render_width;
+    guint32 ref_order_hint; /* is guint32 appropiat? */
+    guint32 ref_mi_cols;
+    guint32 ref_mi_rows;
+    guint8 ref_bit_depth;
+    guint8 ref_subsampling_x;
+    guint8 ref_subsampling_y;
   } entry[GST_AV1_REFS_PER_FRAME];
 };
 
 
 /**
- * _GstAV1TileListOBU:
+ * GstAV1TileListOBU:
  *
  * @output_frame_width_in_tiles_minus_1: plus one is the width of the output frame, in tile units.
  * @output_frame_height_in_tiles_minus_1: plus one is the height of the output frame, in tile units.
@@ -1532,15 +1541,15 @@ struct _GstAV1TileListOBU {
     guint8 anchor_tile_row;
     guint8 anchor_tile_col;
     guint16 tile_data_size_minus_1;
-    /*guint8 coded_tile_data[]; skipped */
+    guint8 *coded_tile_data;
   } entry[GST_AV1_MAX_TILE_COUNT];
 };
 
 /**
- * _GstAV1TileListOBU:
+ * GstAV1TileGroupOBU:
  *
  *
- * @NumTiles: specifies the total number of tiles in the frame.
+ * @num_tiles: specifies the total number of tiles in the frame.
  * @tile_start_and_end_present_flag: specifies whether tg_start and tg_end are present in the bitstream.
  *                                   If tg_start and tg_end are not present in the bitstream, this tile group covers the
  *                                   entire frame. If obu_type is equal to OBU_FRAME, it is a requirement of bitstream conformance
@@ -1551,36 +1560,36 @@ struct _GstAV1TileListOBU {
  * @tg_end: specifies the zero-based index of the last tile in the current tile group.
  *          It is a requirement of bitstream conformance that the value of tg_end is greater than or equal to tg_start.
  *          It is a requirement of bitstream conformance that the value of tg_end for the last tile group in each frame is equal to
- *          NumTiles-1.
- * @tileRow:
- * @tileCol:
- * @tileSize: specifies the size in bytes of the next coded tile.
- * @MiRowStart:
- * @MiRowEnd:
- * @MiColStart:
- * @MiColEnd:
- * @CurrentQIndex:
+ *          num_tiles-1.
+ * @tile_row:
+ * @tile_col:
+ * @tile_size: specifies the size in bytes of the next coded tile.
+ * @mi_row_start:
+ * @mi_row_end:
+ * @mi_col_start:
+ * @mi_col_end:
+ * @current_q_index:
  *
  */
 struct _GstAV1TileGroupOBU {
-  guint32 NumTiles;
+  guint32 num_tiles;
   gboolean tile_start_and_end_present_flag;
   guint8 tg_start;
   guint8 tg_end;
   struct {
-    guint32 tileRow;
-    guint32 tileCol;
-    guint32 tileSize;
-    guint32 MiRowStart;
-    guint32 MiRowEnd;
-    guint32 MiColStart;
-    guint32 MiColEnd;
-    guint8 CurrentQIndex;
+    guint32 tile_row;
+    guint32 tile_col;
+    guint32 tile_size;
+    guint32 mi_row_start;
+    guint32 mi_row_end;
+    guint32 mi_col_start;
+    guint32 mi_col_end;
+    guint8 current_q_index;
   } entry[GST_AV1_MAX_TILE_COUNT];
 };
 
 /**
- * _GstAV1FrameOBU:
+ * GstAV1FrameOBU:
  *
  */
 struct _GstAV1FrameOBU {
@@ -1591,8 +1600,6 @@ struct _GstAV1FrameOBU {
 /**
  * GstAV1Parser:
  *
- * @SeenFrameHeader: is a variable used to mark whether the frame header for the current frame has been received.
- *                   It is initialized to zero.
  *
  */
 
@@ -1602,7 +1609,7 @@ struct _GstAV1Parser {
 
   guint8 subsampling_x;
   guint8 subsampling_y;
-  guint8 BitDepth;
+  guint8 bit_depth;
 
   GstAV1ReferenceFrameInfo ref_info;
   /*References */
@@ -1610,10 +1617,6 @@ struct _GstAV1Parser {
   GstAV1FrameHeaderOBU *frame_header;
 };
 
-/**
- * GstAV1AnnexB:
- *
- */
 
 
 GST_CODEC_PARSERS_API
@@ -1635,6 +1638,9 @@ GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1TileListOBU * tile_list);
 
 GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_free_coded_tile_data_from_tile_list_obu (GstAV1TileListOBU * tile_list);
+
+GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstBitReader * br, gsize sz, GstAV1TileGroupOBU * tile_group);
 
 GST_CODEC_PARSERS_API
@@ -1643,8 +1649,8 @@ GstAV1ParserResult gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstBit
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameOBU * frame);
 
-GstAV1ParserResult
-gst_av1_parse_annexb_unit_size(GstAV1Parser * parser, GstBitReader * br, gsize * unit_size);
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_annexb_unit_size(GstAV1Parser * parser, GstBitReader * br, gsize * unit_size);
 
 GST_CODEC_PARSERS_API
 void               gst_av1_parser_free (GstAV1Parser * parser);
