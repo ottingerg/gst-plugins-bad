@@ -139,7 +139,6 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   assert_equals_int (frame.frame_header.order_hint, 0);
   assert_equals_int (frame.frame_header.render_and_frame_size_different, 0);
   assert_equals_int (frame.frame_header.disable_frame_end_update_cdf, 0);
-  assert_equals_int (frame.frame_header.tile_info.uniform_tile_spacing_flag, 1);
   assert_equals_int (frame.frame_header.quantization_params.base_q_idx, 15);
   assert_equals_int (frame.frame_header.quantization_params.delta_q_ydc, 0);
   assert_equals_int (frame.frame_header.quantization_params.delta_q_udc, 0);
@@ -181,13 +180,13 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   assert_equals_int (frame.frame_header.cdef_params.cdef_uv_pri_strength[0], 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_uv_sec_strength[0], 1);
   assert_equals_int (frame.frame_header.
-      loop_restoration_params.FrameRestorationType[0],
+      loop_restoration_params.frame_restoration_type[0],
       GST_AV1_FRAME_RESTORE_NONE);
   assert_equals_int (frame.frame_header.
-      loop_restoration_params.FrameRestorationType[1],
+      loop_restoration_params.frame_restoration_type[1],
       GST_AV1_FRAME_RESTORE_NONE);
   assert_equals_int (frame.frame_header.
-      loop_restoration_params.FrameRestorationType[2],
+      loop_restoration_params.frame_restoration_type[2],
       GST_AV1_FRAME_RESTORE_NONE);
   assert_equals_int (frame.frame_header.tx_mode_select, 0);
   assert_equals_int (frame.frame_header.reduced_tx_set, 0);
@@ -279,13 +278,13 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   assert_equals_int (frame.frame_header.cdef_params.cdef_uv_pri_strength[0], 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_uv_sec_strength[0], 4);
   assert_equals_int (frame.frame_header.
-      loop_restoration_params.FrameRestorationType[0],
+      loop_restoration_params.frame_restoration_type[0],
       GST_AV1_FRAME_RESTORE_NONE);
   assert_equals_int (frame.frame_header.
-      loop_restoration_params.FrameRestorationType[1],
+      loop_restoration_params.frame_restoration_type[1],
       GST_AV1_FRAME_RESTORE_NONE);
   assert_equals_int (frame.frame_header.
-      loop_restoration_params.FrameRestorationType[2],
+      loop_restoration_params.frame_restoration_type[2],
       GST_AV1_FRAME_RESTORE_NONE);
   assert_equals_int (frame.frame_header.tx_mode_select, 0);
   assert_equals_int (frame.frame_header.reference_select, 0);
