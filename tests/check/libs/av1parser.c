@@ -141,9 +141,9 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   assert_equals_int (frame.frame_header.disable_frame_end_update_cdf, 0);
   assert_equals_int (frame.frame_header.tile_info.uniform_tile_spacing_flag, 1);
   assert_equals_int (frame.frame_header.quantization_params.base_q_idx, 15);
-  assert_equals_int (frame.frame_header.quantization_params.DeltaQYDc, 0);
-  assert_equals_int (frame.frame_header.quantization_params.DeltaQUDc, 0);
-  assert_equals_int (frame.frame_header.quantization_params.DeltaQUAc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.delta_q_ydc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.delta_q_udc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.delta_q_uac, 0);
   assert_equals_int (frame.frame_header.quantization_params.using_qmatrix, 0);
   assert_equals_int (frame.frame_header.quantization_params.delta_q_present, 0);
   assert_equals_int (frame.frame_header.loop_filter_params.loop_filter_level[0],
@@ -237,9 +237,9 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   assert_equals_int (frame.frame_header.use_ref_frame_mvs, 1);
   assert_equals_int (frame.frame_header.disable_frame_end_update_cdf, 0);
   assert_equals_int (frame.frame_header.quantization_params.base_q_idx, 20);
-  assert_equals_int (frame.frame_header.quantization_params.DeltaQYDc, 0);
-  assert_equals_int (frame.frame_header.quantization_params.DeltaQUDc, 0);
-  assert_equals_int (frame.frame_header.quantization_params.DeltaQUAc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.delta_q_ydc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.delta_q_udc, 0);
+  assert_equals_int (frame.frame_header.quantization_params.delta_q_uac, 0);
   assert_equals_int (frame.frame_header.quantization_params.using_qmatrix, 0);
   assert_equals_int (frame.frame_header.
       segmentation_params.segmentation_enabled, 0);
