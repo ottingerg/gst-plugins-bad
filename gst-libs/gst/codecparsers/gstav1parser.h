@@ -84,6 +84,7 @@ G_BEGIN_DECLS
 
 typedef struct _GstAV1Parser GstAV1Parser;
 
+typedef struct _GstAV1OBU GstAV1OBU;
 typedef struct _GstAV1OBUHeader GstAV1OBUHeader;
 typedef struct _GstAV1OBUHeaderExtention GstAV1OBUHeaderExtention;
 
@@ -417,6 +418,15 @@ struct _GstAV1OBUHeader {
   GstAV1OBUHeaderExtention extention;
 };
 
+/**
+ * GstAV1OBU:
+ *
+ */
+struct _GstAV1OBU {
+  GstAV1OBUHeader header;
+  const guint8 *data;
+  gsize size;
+}
 
 
 
@@ -1554,7 +1564,7 @@ GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (void);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br, GstAV1OBUHeader * obu_header, gsize annexb_sz);
+GstAV1ParserResult gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br, GstAV1OBUHeader * obu_header);
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1SequenceHeaderOBU * seq_header);
