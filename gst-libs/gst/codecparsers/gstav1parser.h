@@ -652,6 +652,7 @@ struct _GstAV1SequenceHeaderOBU {
   gboolean enable_restoration;
 
   gboolean film_grain_params_present;
+  gboolean initial_display_delay_present_flag;
 
 
   guint8 operating_points_cnt_minus_1;
@@ -659,7 +660,6 @@ struct _GstAV1SequenceHeaderOBU {
 
   gboolean decoder_model_info_present_flag;
   GstAV1DecoderModelInfo decoder_model_info;
-  gboolean initial_display_delay_present_flag;
 
   gboolean timing_info_present_flag;
   GstAV1TimingInfo timing_info;
@@ -1376,8 +1376,10 @@ struct _GstAV1FrameHeaderOBU {
   guint32 render_width;
   guint32 render_height;
   guint32 superres_denom;
+
   gboolean is_filter_switchable;
   GstAV1InterpolationFilter interpolation_filter;
+
   GstAV1LoopFilterParams loop_filter_params;
   GstAV1QuantizationParams quantization_params;
   GstAV1SegmenationParams segmentation_params;

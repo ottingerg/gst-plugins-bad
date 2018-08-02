@@ -1072,7 +1072,7 @@ gst_av1_parse_quantization_params (GstAV1Parser * parser, GstBitReader * br,
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
-  color_config = &(parser->seq_header->color_config);
+  color_config = &(parser->seq_header.color_config);
 
   quant_params->base_q_idx = gst_av1_read_bits (br, 8);
 
@@ -1378,7 +1378,7 @@ gst_av1_parse_loop_filter_params (GstAV1Parser * parser, GstBitReader * br,
 {
   GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
-  GstAV1SequenceHeaderOBU *seq_header;
+  GstAV1ColorConfig *color_config;
   gint i;
 
   GST_AV1_DEBUG ();
@@ -1387,7 +1387,7 @@ gst_av1_parse_loop_filter_params (GstAV1Parser * parser, GstBitReader * br,
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
-  seq_header = parser->seq_header;
+  color_config = parser->seq_header.color_config;
 
 
   if (!parser->frame_header) {
@@ -1415,7 +1415,7 @@ gst_av1_parse_loop_filter_params (GstAV1Parser * parser, GstBitReader * br,
 
   lf_params->loop_filter_level[0] = gst_av1_read_bits (br, 6);
   lf_params->loop_filter_level[1] = gst_av1_read_bits (br, 6);
-  if (seq_header->color_config.num_planes > 1) {
+  if (color_config->num_planes > 1) {
     if (lf_params->loop_filter_level[0] || lf_params->loop_filter_level[1]) {
       lf_params->loop_filter_level[2] = gst_av1_read_bits (br, 6);
       lf_params->loop_filter_level[3] = gst_av1_read_bits (br, 6);
@@ -2587,7 +2587,7 @@ gst_av1_load_reference_frame (GstAV1Parser * parser)
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_mi_rows;
   parser->subsampling_x =
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_subsampling_x;
-  parser->subsampling_x =
+  parser->subsampling_y =
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_subsampling_y;
   parser->bit_depth =
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_bit_depth;
