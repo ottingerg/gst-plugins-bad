@@ -1072,7 +1072,7 @@ gst_av1_parse_quantization_params (GstAV1Parser * parser, GstBitReader * br,
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
-  color_config = &(parser->seq_header.color_config);
+  color_config = &(parser->seq_header->color_config);
 
   quant_params->base_q_idx = gst_av1_read_bits (br, 8);
 
@@ -1387,7 +1387,7 @@ gst_av1_parse_loop_filter_params (GstAV1Parser * parser, GstBitReader * br,
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
-  color_config = parser->seq_header.color_config;
+  color_config = &(parser->seq_header->color_config);
 
 
   if (!parser->frame_header) {
