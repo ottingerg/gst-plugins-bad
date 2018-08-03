@@ -426,7 +426,9 @@ struct _GstAV1OBU {
   GstAV1OBUHeader header;
   const guint8 *data;
   gsize size;
-}
+
+  guint32 parser_frame_id;
+};
 
 
 
@@ -1548,6 +1550,8 @@ struct _GstAV1Parser {
 
   void *priv;
 
+  gboolean use_annexb;
+
   guint8 subsampling_x;
   guint8 subsampling_y;
   guint8 bit_depth;
@@ -1560,38 +1564,43 @@ struct _GstAV1Parser {
 
 
 
-GST_CODEC_PARSERS_API
-GstAV1Parser *     gst_av1_parser_new (void);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br, GstAV1OBUHeader * obu_header);
+GstAV1ParserResult gst_av1_parse_annexb_unit_size (GstAV1Parser * parser, const guint8 * data, guint offset, gsize size, gsize * unit_size);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1SequenceHeaderOBU * seq_header);
+GstAV1ParserResult gst_av1_parse_get_first_obu (GstAV1Parser * parser, const guint8 * data, guint offset, gsize size, GstAV1OBU * obu);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstBitReader * br);
+GstAV1ParserResult gst_av1_parse_get_next_obu (GstAV1Parser * parser, const guint8 * data, guint offset, gsize size, GstAV1OBU * prev_obu, GstAV1OBU * current_obu);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_metadata_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1MetadataOBU * metadata);
+GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1SequenceHeaderOBU * seq_header);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1TileListOBU * tile_list);
+GstAV1ParserResult gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstAV1OBU * obu);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_metadata_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1MetadataOBU * metadata);
+
+GST_CODEC_PARSERS_API
+GstAV1ParserResult gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1TileListOBU * tile_list);
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_free_coded_tile_data_from_tile_list_obu (GstAV1TileListOBU * tile_list);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstBitReader * br, gsize sz, GstAV1TileGroupOBU * tile_group);
+GstAV1ParserResult gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1TileGroupOBU * tile_group);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameHeaderOBU * frame_header);
+GstAV1ParserResult gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1FrameHeaderOBU * frame_header);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_frame_obu (GstAV1Parser * parser, GstBitReader * br, GstAV1FrameOBU * frame);
+GstAV1ParserResult gst_av1_parse_frame_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1FrameOBU * frame);
+
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_annexb_unit_size(GstAV1Parser * parser, GstBitReader * br, gsize * unit_size);
+GstAV1Parser *     gst_av1_parser_new (gboolean use_annexb);
 
 GST_CODEC_PARSERS_API
 void               gst_av1_parser_free (GstAV1Parser * parser);
