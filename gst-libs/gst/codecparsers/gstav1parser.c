@@ -38,8 +38,6 @@
 #include <glib.h>
 #include "gstav1parser.h"
 
-
-
 #define GST_AV1_DEBUG() GST_DEBUG("enter")
 #define GST_AV1_EVAL_RETVAL_LOGGED(ret) if (ret != GST_AV1_PARSER_OK) { GST_LOG("Parser-Error(%d) at line %d",(gint)ret, __LINE__); return ret; }
 
@@ -310,6 +308,7 @@ gst_av1_bitstreamfn_delta_q (GstBitReader * br, GstAV1ParserResult * retval)
   return 0;
 }
 
+/*
 static GstAV1ParserResult
 gst_av1_bitstreamfn_trailing_bits (GstBitReader * br, gsize nbBits)
 {
@@ -331,7 +330,7 @@ gst_av1_bitstreamfn_trailing_bits (GstBitReader * br, gsize nbBits)
 
   return GST_AV1_PARSER_OK;
 }
-
+*/
 /*************************************
  *                                   *
  * Parser Functions                  *
@@ -361,7 +360,7 @@ gst_av1_skip_trailing_bits (GstAV1Parser * parser, GstBitReader * br)
 
 GstAV1ParserResult
 gst_av1_parse_annexb_unit_size (GstAV1Parser * parser,
-    const guint8 * data, guint offset, gsize size, gsize * unit_size)
+    const guint8 * data, gsize offset, gsize size, gsize * unit_size)
 {
   GstBitReader br;
   GstAV1ParserResult retval;
@@ -372,7 +371,7 @@ gst_av1_parse_annexb_unit_size (GstAV1Parser * parser,
 
   if (size < offset + 1) {
     GST_DEBUG ("Can't parse, buffer has too small size %" G_GSIZE_FORMAT
-        ", offset %u", size, offset);
+        ", offset %" G_GSIZE_FORMAT, size, offset);
     return GST_AV1_PARSER_ERROR;
   }
 
@@ -438,11 +437,11 @@ gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
 
 GstAV1ParserResult
 gst_av1_parse_get_first_obu (GstAV1Parser * parser,
-    const guint8 * data, guint offset, gsize size, GstAV1OBU * obu)
+    const guint8 * data, gsize offset, gsize size, GstAV1OBU * obu)
 {
   GstAV1ParserResult retval;
   GstBitReader br;
-  gsize obu_length;
+  gsize obu_length = 0;
 
 
   memset (obu, 0, sizeof (GstAV1OBU));
@@ -452,7 +451,7 @@ gst_av1_parse_get_first_obu (GstAV1Parser * parser,
 
   if (size < offset + 2) {
     GST_DEBUG ("Can't parse, buffer has too small size %" G_GSIZE_FORMAT
-        ", offset %u", size, offset);
+        ", offset %" G_GSIZE_FORMAT, size, offset);
     return GST_AV1_PARSER_ERROR;
   }
 
@@ -466,7 +465,9 @@ gst_av1_parse_get_first_obu (GstAV1Parser * parser,
   retval = gst_av1_parse_obu_header (parser, &br, &(obu->header));
 
   if (retval == GST_AV1_PARSER_OK) {
-    obu->data = data + offset + gst_av1_bit_reader_get_pos (&br) / 8;
+    obu->offset = offset;
+    obu->header_size = gst_av1_bit_reader_get_pos (&br) / 8;
+    obu->data = data + offset + obu->header_size;
     if (parser->use_annexb)
       obu->size = obu_length;
     else
@@ -478,10 +479,10 @@ gst_av1_parse_get_first_obu (GstAV1Parser * parser,
 
 GstAV1ParserResult
 gst_av1_parse_get_next_obu (GstAV1Parser * parser,
-    const guint8 * data, guint offset, gsize size, GstAV1OBU * prev_obu,
+    const guint8 * data, gsize offset, gsize size, GstAV1OBU * prev_obu,
     GstAV1OBU * current_obu)
 {
-  offset += prev_obu->size;
+  offset += prev_obu->offset + prev_obu->size + prev_obu->header_size;
 
   return gst_av1_parse_get_first_obu (parser, data, offset, size, current_obu);
 }

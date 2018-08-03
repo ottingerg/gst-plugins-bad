@@ -50,38 +50,41 @@ static const guint8 aom_testdata_av1_1_b8_01_size_16x16[] = {
 GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
 {
   GstAV1Parser *parser;
-  GstBitReader *br;
-  GstAV1OBUHeader obu_header;
+  GstAV1OBU obu;
   GstAV1SequenceHeaderOBU seq_header;
   GstAV1FrameOBU frame;
+  gsize size;
+  const guint8 *data;
 
 
-  bzero (&obu_header, sizeof (obu_header));
+  bzero (&obu, sizeof (obu));
   bzero (&seq_header, sizeof (seq_header));
   bzero (&frame, sizeof (frame));
 
-  parser = gst_av1_parser_new ();
-  br = gst_bit_reader_new (aom_testdata_av1_1_b8_01_size_16x16,
-      sizeof (aom_testdata_av1_1_b8_01_size_16x16));
+  parser = gst_av1_parser_new (FALSE);
+
+  data = aom_testdata_av1_1_b8_01_size_16x16;
+  size = sizeof (aom_testdata_av1_1_b8_01_size_16x16);
 
   /* 1st OBU should be OBU_TEMPORAL_DELIMITER */
-  gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
-  assert_equals_int (obu_header.obu_extention_flag, 0);
-  assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_size, 0);
+  gst_av1_parse_get_first_obu (parser, data, 0, size, &obu);
+  assert_equals_int (obu.header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
+  assert_equals_int (obu.header.obu_extention_flag, 0);
+  assert_equals_int (obu.header.obu_has_size_field, 1);
+  assert_equals_int (obu.header.obu_size, 0);
 
-  gst_av1_parse_temporal_delimiter_obu (parser, br);
+  gst_av1_parse_temporal_delimiter_obu (parser, &obu);
+
 
 
   /* 2nd OBU should be OBU_SEQUENCE_HEADER */
-  gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_SEQUENCE_HEADER);
-  assert_equals_int (obu_header.obu_extention_flag, 0);
-  assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_size, 10);
+  gst_av1_parse_get_next_obu (parser, data, 0, size, &obu, &obu);
+  assert_equals_int (obu.header.obu_type, GST_AV1_OBU_SEQUENCE_HEADER);
+  assert_equals_int (obu.header.obu_extention_flag, 0);
+  assert_equals_int (obu.header.obu_has_size_field, 1);
+  assert_equals_int (obu.header.obu_size, 10);
 
-  gst_av1_parse_sequence_header_obu (parser, br, &seq_header);
+  gst_av1_parse_sequence_header_obu (parser, &obu, &seq_header);
   assert_equals_int (seq_header.seq_profile, 0);
   assert_equals_int (seq_header.still_picture, 0);
   assert_equals_int (seq_header.reduced_still_picture_header, 0);
@@ -123,13 +126,13 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
 
 
   /* 3rd OBU should be GST_AV1_OBU_FRAME */
-  gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_FRAME);
-  assert_equals_int (obu_header.obu_extention_flag, 0);
-  assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_size, 166);
+  gst_av1_parse_get_next_obu (parser, data, 0, size, &obu, &obu);
+  assert_equals_int (obu.header.obu_type, GST_AV1_OBU_FRAME);
+  assert_equals_int (obu.header.obu_extention_flag, 0);
+  assert_equals_int (obu.header.obu_has_size_field, 1);
+  assert_equals_int (obu.header.obu_size, 166);
 
-  gst_av1_parse_frame_obu (parser, br, &frame);
+  gst_av1_parse_frame_obu (parser, &obu, &frame);
   assert_equals_int (frame.frame_header.show_existing_frame, 0);
   assert_equals_int (frame.frame_header.frame_type, GST_AV1_KEY_FRAME);
   assert_equals_int (frame.frame_header.show_frame, 1);
@@ -149,12 +152,12 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
       0);
   assert_equals_int (frame.frame_header.loop_filter_params.loop_filter_level[1],
       0);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.loop_filter_sharpness, 0);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.loop_filter_delta_enabled, 1);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.loop_filter_delta_update, 1);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      loop_filter_sharpness, 0);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      loop_filter_delta_enabled, 1);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      loop_filter_delta_update, 1);
   assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[0],
       0);
   assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[1],
@@ -169,47 +172,44 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
       0);
   assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[6],
       0);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.update_mode_deltas[0], 0);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.update_mode_deltas[1], 0);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      update_mode_deltas[0], 0);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      update_mode_deltas[1], 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_damping_minus_3, 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_bits, 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_y_pri_strength[0], 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_y_sec_strength[0], 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_uv_pri_strength[0], 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_uv_sec_strength[0], 1);
-  assert_equals_int (frame.frame_header.
-      loop_restoration_params.frame_restoration_type[0],
-      GST_AV1_FRAME_RESTORE_NONE);
-  assert_equals_int (frame.frame_header.
-      loop_restoration_params.frame_restoration_type[1],
-      GST_AV1_FRAME_RESTORE_NONE);
-  assert_equals_int (frame.frame_header.
-      loop_restoration_params.frame_restoration_type[2],
-      GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.loop_restoration_params.
+      frame_restoration_type[0], GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.loop_restoration_params.
+      frame_restoration_type[1], GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.loop_restoration_params.
+      frame_restoration_type[2], GST_AV1_FRAME_RESTORE_NONE);
   assert_equals_int (frame.frame_header.tx_mode_select, 0);
   assert_equals_int (frame.frame_header.reduced_tx_set, 0);
 
 
   /* 4th OBU should be OBU_TEMPORAL_DELIMITER */
-  gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
-  assert_equals_int (obu_header.obu_extention_flag, 0);
-  assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_size, 0);
+  gst_av1_parse_get_next_obu (parser, data, 0, size, &obu, &obu);
+  assert_equals_int (obu.header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
+  assert_equals_int (obu.header.obu_extention_flag, 0);
+  assert_equals_int (obu.header.obu_has_size_field, 1);
+  assert_equals_int (obu.header.obu_size, 0);
 
-  gst_av1_parse_temporal_delimiter_obu (parser, br);
+  gst_av1_parse_temporal_delimiter_obu (parser, &obu);
 
 
   /* 5th OBU should be GST_AV1_OBU_FRAME */
-  gst_av1_parse_obu_header (parser, br, &obu_header, 0);
-  assert_equals_int (obu_header.obu_type, GST_AV1_OBU_FRAME);
-  assert_equals_int (obu_header.obu_extention_flag, 0);
-  assert_equals_int (obu_header.obu_has_size_field, 1);
-  assert_equals_int (obu_header.obu_size, 75);
+  gst_av1_parse_get_next_obu (parser, data, 0, size, &obu, &obu);
+  assert_equals_int (obu.header.obu_type, GST_AV1_OBU_FRAME);
+  assert_equals_int (obu.header.obu_extention_flag, 0);
+  assert_equals_int (obu.header.obu_has_size_field, 1);
+  assert_equals_int (obu.header.obu_size, 75);
 
-  gst_av1_parse_frame_obu (parser, br, &frame);
+  gst_av1_parse_frame_obu (parser, &obu, &frame);
   assert_equals_int (frame.frame_header.show_existing_frame, 0);
   assert_equals_int (frame.frame_header.frame_type, GST_AV1_INTER_FRAME);
   assert_equals_int (frame.frame_header.show_frame, 1);
@@ -240,19 +240,19 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   assert_equals_int (frame.frame_header.quantization_params.delta_q_udc, 0);
   assert_equals_int (frame.frame_header.quantization_params.delta_q_uac, 0);
   assert_equals_int (frame.frame_header.quantization_params.using_qmatrix, 0);
-  assert_equals_int (frame.frame_header.
-      segmentation_params.segmentation_enabled, 0);
+  assert_equals_int (frame.frame_header.segmentation_params.
+      segmentation_enabled, 0);
   assert_equals_int (frame.frame_header.quantization_params.delta_q_present, 0);
   assert_equals_int (frame.frame_header.loop_filter_params.loop_filter_level[0],
       0);
   assert_equals_int (frame.frame_header.loop_filter_params.loop_filter_level[1],
       0);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.loop_filter_sharpness, 0);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.loop_filter_delta_enabled, 1);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.loop_filter_delta_update, 1);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      loop_filter_sharpness, 0);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      loop_filter_delta_enabled, 1);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      loop_filter_delta_update, 1);
   assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[0],
       0);
   assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[1],
@@ -267,25 +267,22 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
       0);
   assert_equals_int (frame.frame_header.loop_filter_params.update_ref_deltas[6],
       0);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.update_mode_deltas[0], 0);
-  assert_equals_int (frame.frame_header.
-      loop_filter_params.update_mode_deltas[1], 0);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      update_mode_deltas[0], 0);
+  assert_equals_int (frame.frame_header.loop_filter_params.
+      update_mode_deltas[1], 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_damping_minus_3, 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_bits, 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_y_pri_strength[0], 1);
   assert_equals_int (frame.frame_header.cdef_params.cdef_y_sec_strength[0], 1);
   assert_equals_int (frame.frame_header.cdef_params.cdef_uv_pri_strength[0], 0);
   assert_equals_int (frame.frame_header.cdef_params.cdef_uv_sec_strength[0], 4);
-  assert_equals_int (frame.frame_header.
-      loop_restoration_params.frame_restoration_type[0],
-      GST_AV1_FRAME_RESTORE_NONE);
-  assert_equals_int (frame.frame_header.
-      loop_restoration_params.frame_restoration_type[1],
-      GST_AV1_FRAME_RESTORE_NONE);
-  assert_equals_int (frame.frame_header.
-      loop_restoration_params.frame_restoration_type[2],
-      GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.loop_restoration_params.
+      frame_restoration_type[0], GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.loop_restoration_params.
+      frame_restoration_type[1], GST_AV1_FRAME_RESTORE_NONE);
+  assert_equals_int (frame.frame_header.loop_restoration_params.
+      frame_restoration_type[2], GST_AV1_FRAME_RESTORE_NONE);
   assert_equals_int (frame.frame_header.tx_mode_select, 0);
   assert_equals_int (frame.frame_header.reference_select, 0);
   assert_equals_int (frame.frame_header.allow_warped_motion, 1);
@@ -298,7 +295,6 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   assert_equals_int (frame.frame_header.global_motion_params.is_global[6], 0);
 
 
-  gst_bit_reader_free (br);
   gst_av1_parser_free (parser);
 
 }

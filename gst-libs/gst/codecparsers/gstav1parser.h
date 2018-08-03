@@ -426,6 +426,8 @@ struct _GstAV1OBU {
   GstAV1OBUHeader header;
   const guint8 *data;
   gsize size;
+  gsize offset;
+  gsize header_size;
 
   guint32 parser_frame_id;
 };
@@ -1566,13 +1568,13 @@ struct _GstAV1Parser {
 
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_annexb_unit_size (GstAV1Parser * parser, const guint8 * data, guint offset, gsize size, gsize * unit_size);
+GstAV1ParserResult gst_av1_parse_annexb_unit_size (GstAV1Parser * parser, const guint8 * data, gsize offset, gsize size, gsize * unit_size);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_get_first_obu (GstAV1Parser * parser, const guint8 * data, guint offset, gsize size, GstAV1OBU * obu);
+GstAV1ParserResult gst_av1_parse_get_first_obu (GstAV1Parser * parser, const guint8 * data, gsize offset, gsize size, GstAV1OBU * obu);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_get_next_obu (GstAV1Parser * parser, const guint8 * data, guint offset, gsize size, GstAV1OBU * prev_obu, GstAV1OBU * current_obu);
+GstAV1ParserResult gst_av1_parse_get_next_obu (GstAV1Parser * parser, const guint8 * data, gsize offset, gsize size, GstAV1OBU * prev_obu, GstAV1OBU * current_obu);
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1SequenceHeaderOBU * seq_header);
