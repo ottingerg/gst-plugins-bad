@@ -356,8 +356,8 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
 GST_END_TEST;
 
 
-GST_START_TEST (test_av1_parse_annexb)
-{
+GST_START_TEST
+    (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16_reencoded_annexb) {
   GstAV1Parser *parser;
   GstAV1OBU obu;
   GstAV1SequenceHeaderOBU seq_header;
@@ -392,7 +392,7 @@ GST_START_TEST (test_av1_parse_annexb)
   assert_equals_int (obu.header.obu_type, GST_AV1_OBU_SEQUENCE_HEADER);
   assert_equals_int (obu.header.obu_extention_flag, 0);
   assert_equals_int (obu.header.obu_has_size_field, 0);
-  assert_equals_int (obu.size, 11);
+  assert_equals_int (obu.size, 10);
 
   gst_av1_parse_sequence_header_obu (parser, &obu, &seq_header);
   assert_equals_int (seq_header.seq_profile, 0);
@@ -407,7 +407,7 @@ GST_START_TEST (test_av1_parse_annexb)
   assert_equals_int (obu.header.obu_type, GST_AV1_OBU_FRAME);
   assert_equals_int (obu.header.obu_extention_flag, 0);
   assert_equals_int (obu.header.obu_has_size_field, 0);
-  assert_equals_int (obu.header.obu_size, 248);
+  assert_equals_int (obu.size, 248);
 
   gst_av1_parse_frame_obu (parser, &obu, &frame);
   assert_equals_int (frame.frame_header.show_existing_frame, 0);
@@ -418,22 +418,23 @@ GST_START_TEST (test_av1_parse_annexb)
 
   /* 4th OBU should be OBU_TEMPORAL_DELIMITER */
   gst_av1_parse_get_next_obu (parser, &obu);
+  assert_equals_int (parser->annexb.temporal_unit_size, 251);
+  assert_equals_int (parser->annexb.frame_unit_size, 249);
   assert_equals_int (obu.header.obu_type, GST_AV1_OBU_TEMPORAL_DELIMITER);
   assert_equals_int (obu.header.obu_extention_flag, 0);
   assert_equals_int (obu.header.obu_has_size_field, 0);
-  assert_equals_int (obu.header.obu_size, 0);
+  assert_equals_int (obu.size, 0);
 
   gst_av1_parse_temporal_delimiter_obu (parser, &obu);
 
 
   /* 5th OBU should be GST_AV1_OBU_FRAME */
   gst_av1_parse_get_next_obu (parser, &obu);
-  assert_equals_int (parser->annexb.temporal_unit_size, 253);
-  assert_equals_int (parser->annexb.frame_unit_size, 251);
+
   assert_equals_int (obu.header.obu_type, GST_AV1_OBU_FRAME);
   assert_equals_int (obu.header.obu_extention_flag, 0);
   assert_equals_int (obu.header.obu_has_size_field, 0);
-  assert_equals_int (obu.header.obu_size, 244);
+  assert_equals_int (obu.size, 244);
 
   gst_av1_parse_frame_obu (parser, &obu, &frame);
   assert_equals_int (frame.frame_header.show_existing_frame, 0);
@@ -456,7 +457,8 @@ av1parsers_suite (void)
 
   suite_add_tcase (s, tc_chain);
   tcase_add_test (tc_chain, test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16);
-  tcase_add_test (tc_chain, test_av1_parse_annexb);
+  tcase_add_test (tc_chain,
+      test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16_reencoded_annexb);
 
   return s;
 }
