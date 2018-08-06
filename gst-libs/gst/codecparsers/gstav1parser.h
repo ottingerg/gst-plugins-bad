@@ -1554,9 +1554,10 @@ struct _GstAV1Parser {
 
   gboolean use_annexb;
 
-  guint8 subsampling_x;
-  guint8 subsampling_y;
-  guint8 bit_depth;
+  struct {
+    gsize temporal_unit_size;
+    gsize frame_unit_size;
+  } annexb;
 
   GstAV1ReferenceFrameInfo ref_info;
   /*References */
@@ -1566,15 +1567,11 @@ struct _GstAV1Parser {
 
 
 
-
-GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_annexb_unit_size (GstAV1Parser * parser, const guint8 * data, gsize offset, gsize size, gsize * unit_size);
-
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_get_first_obu (GstAV1Parser * parser, const guint8 * data, gsize offset, gsize size, GstAV1OBU * obu);
 
 GST_CODEC_PARSERS_API
-GstAV1ParserResult gst_av1_parse_get_next_obu (GstAV1Parser * parser, const guint8 * data, gsize offset, gsize size, GstAV1OBU * prev_obu, GstAV1OBU * current_obu);
+GstAV1ParserResult gst_av1_parse_get_next_obu (GstAV1Parser * parser, GstAV1OBU * obu);
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1SequenceHeaderOBU * seq_header);

@@ -38,7 +38,8 @@
 #include <glib.h>
 #include "gstav1parser.h"
 
-#define GST_AV1_DEBUG() GST_DEBUG("enter")
+#include <stdio.h>
+#define GST_AV1_DEBUG() while(0) { GST_DEBUG("enter"); }
 #define GST_AV1_EVAL_RETVAL_LOGGED(ret) if (ret != GST_AV1_PARSER_OK) { GST_LOG("Parser-Error(%d) at line %d",(gint)ret, __LINE__); return ret; }
 
 /**
@@ -51,8 +52,14 @@
 typedef struct
 {
   gboolean seen_frame_header;
+
+  guint8 subsampling_x;
+  guint8 subsampling_y;
+  guint8 bit_depth;
+
   guint8 temporal_id;
   guint8 spatial_id;
+
   /*guint32 parser_frame_id; might be needed for frame unit accounting with annex b */
   gsize frame_header_size;
 
@@ -60,6 +67,28 @@ typedef struct
      gsize obu_size;
      GstAV1OBUType obu_type;
    */
+
+
+  struct
+  {
+    const guint8 *data;
+    gsize size;
+    gsize offset;
+  } current_chunk;
+
+  struct
+  {
+    gsize offset;
+    gsize size;
+    gsize header_size;
+  } current_obu;
+
+  struct
+  {
+    gsize temporal_unit_bytes_left;
+    gsize frame_unit_bytes_left;
+  } annexb;
+
 } GstAV1ParserPrivate;
 
 #define GST_AV1_PARSER_GET_PRIVATE(parser)  ((GstAV1ParserPrivate *)(parser->priv))
@@ -358,16 +387,55 @@ gst_av1_skip_trailing_bits (GstAV1Parser * parser, GstBitReader * br)
 }
 */
 
-GstAV1ParserResult
-gst_av1_parse_annexb_unit_size (GstAV1Parser * parser,
-    const guint8 * data, gsize offset, gsize size, gsize * unit_size)
+static GstAV1ParserResult
+gst_av1_parse_annexb_temporal_and_frame_unit_size (GstAV1Parser * parser,
+    const guint8 * data, gsize offset, gsize size, gsize * bytes_consumed)
 {
+  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
   GstBitReader br;
   GstAV1ParserResult retval;
 
   GST_AV1_DEBUG ();
 
-  /* Minimal data size is 1 byte for leb128 encoded length */
+  /* Minimal data size is 2 bytes for leb128 encoded length (1 for temporal and 1 for frame unit size) */
+
+  if (size < offset + 2) {
+    GST_DEBUG ("Can't parse, buffer has too small size %" G_GSIZE_FORMAT
+        ", offset %" G_GSIZE_FORMAT, size, offset);
+    return GST_AV1_PARSER_ERROR;
+  }
+
+  gst_bit_reader_init (&br, data + offset, size);
+
+  parser->annexb.temporal_unit_size = gst_av1_bitstreamfn_leb128 (&br, &retval);
+  printf ("tempunit: %ld\n", parser->annexb.temporal_unit_size);
+  GST_AV1_EVAL_RETVAL_LOGGED (retval);
+
+  priv->annexb.temporal_unit_bytes_left =
+      parser->annexb.temporal_unit_size - gst_av1_bit_reader_get_pos (&br) / 8;
+
+  parser->annexb.frame_unit_size = gst_av1_bitstreamfn_leb128 (&br, &retval);
+  GST_AV1_EVAL_RETVAL_LOGGED (retval);
+
+  *bytes_consumed = gst_av1_bit_reader_get_pos (&br) / 8;
+
+  priv->annexb.frame_unit_bytes_left =
+      parser->annexb.frame_unit_size - *bytes_consumed;
+
+  return GST_AV1_PARSER_OK;
+}
+
+static GstAV1ParserResult
+gst_av1_parse_annexb_frame_unit_size (GstAV1Parser * parser,
+    const guint8 * data, gsize offset, gsize size, gsize * bytes_consumed)
+{
+  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
+  GstBitReader br;
+  GstAV1ParserResult retval;
+
+  GST_AV1_DEBUG ();
+
+  /* Minimal data size is 1 bytes for leb128 encoded length */
 
   if (size < offset + 1) {
     GST_DEBUG ("Can't parse, buffer has too small size %" G_GSIZE_FORMAT
@@ -375,14 +443,20 @@ gst_av1_parse_annexb_unit_size (GstAV1Parser * parser,
     return GST_AV1_PARSER_ERROR;
   }
 
-
   gst_bit_reader_init (&br, data + offset, size);
 
-  *unit_size = gst_av1_bitstreamfn_leb128 (&br, &retval);
+
+  parser->annexb.frame_unit_size = gst_av1_bitstreamfn_leb128 (&br, &retval);
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
+
+  *bytes_consumed = gst_av1_bit_reader_get_pos (&br) / 8;
+
+  priv->annexb.frame_unit_bytes_left =
+      parser->annexb.frame_unit_size - *bytes_consumed;
 
   return GST_AV1_PARSER_OK;
 }
+
 
 static GstAV1ParserResult
 gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
@@ -435,13 +509,15 @@ gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
   return GST_AV1_PARSER_OK;
 }
 
-GstAV1ParserResult
-gst_av1_parse_get_first_obu (GstAV1Parser * parser,
+static GstAV1ParserResult
+gst_av1_parse_get_obu (GstAV1Parser * parser,
     const guint8 * data, gsize offset, gsize size, GstAV1OBU * obu)
 {
+  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
   GstAV1ParserResult retval;
   GstBitReader br;
   gsize obu_length = 0;
+  gsize bytes_consumed = 0;
 
 
   memset (obu, 0, sizeof (GstAV1OBU));
@@ -459,6 +535,7 @@ gst_av1_parse_get_first_obu (GstAV1Parser * parser,
 
   if (parser->use_annexb) {
     obu_length = gst_av1_bitstreamfn_leb128 (&br, &retval);
+    bytes_consumed = gst_av1_bit_reader_get_pos (&br) / 8;
     GST_AV1_EVAL_RETVAL_LOGGED (retval);
   }
 
@@ -466,42 +543,111 @@ gst_av1_parse_get_first_obu (GstAV1Parser * parser,
 
   if (retval == GST_AV1_PARSER_OK) {
     obu->offset = offset;
-    obu->header_size = gst_av1_bit_reader_get_pos (&br) / 8;
+    obu->header_size = gst_av1_bit_reader_get_pos (&br) / 8 - bytes_consumed;
     obu->data = data + offset + obu->header_size;
-    if (parser->use_annexb)
+    if (parser->use_annexb) {
+      if (obu->header.obu_has_size_field && obu_length != obu->header.obu_size)
+        return GST_AV1_PARSER_BITSTREAM_ERROR;
       obu->size = obu_length;
-    else
+    } else {
       obu->size = obu->header.obu_size;
+    }
+
+    /* duplicate obu information into private parser struct */
+    priv->current_obu.offset = obu->offset;
+    priv->current_obu.header_size = obu->header_size;
+    priv->current_obu.size = obu->size;
+
   }
 
   return retval;
 }
 
 GstAV1ParserResult
-gst_av1_parse_get_next_obu (GstAV1Parser * parser,
-    const guint8 * data, gsize offset, gsize size, GstAV1OBU * prev_obu,
-    GstAV1OBU * current_obu)
+gst_av1_parse_get_first_obu (GstAV1Parser * parser,
+    const guint8 * data, gsize offset, gsize size, GstAV1OBU * obu)
 {
-  offset += prev_obu->offset + prev_obu->size + prev_obu->header_size;
+  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
+  GstAV1ParserResult retval;
+  gsize byte_consumed = 0;
 
-  return gst_av1_parse_get_first_obu (parser, data, offset, size, current_obu);
+  priv->current_chunk.data = data;
+  priv->current_chunk.offset = offset;
+  priv->current_chunk.size = size;
+
+  if (parser->use_annexb) {
+    retval =
+        gst_av1_parse_annexb_temporal_and_frame_unit_size (parser, data, offset,
+        size, &byte_consumed);
+    GST_AV1_EVAL_RETVAL_LOGGED (retval);
+  }
+
+  return gst_av1_parse_get_obu (parser, data, offset + byte_consumed, size,
+      obu);
 }
 
+GstAV1ParserResult
+gst_av1_parse_get_next_obu (GstAV1Parser * parser, GstAV1OBU * obu)
+{
+  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
+  GstAV1ParserResult retval;
+  gsize offset;
+  gsize current_obu_total_size;
+  gsize bytes_consumed = 0;
+
+
+  current_obu_total_size =
+      priv->current_obu.size + priv->current_obu.header_size;
+
+  offset =
+      priv->current_chunk.offset + priv->current_obu.offset +
+      current_obu_total_size;
+
+  printf ("offset: %ld current_obu.header_size: %ld current_obu.size: %ld  \n",
+      offset, priv->current_obu.header_size, priv->current_obu.size);
+
+  if (parser->use_annexb) {
+    if (priv->annexb.temporal_unit_bytes_left < current_obu_total_size)
+      return GST_AV1_PARSER_BITSTREAM_ERROR;
+    priv->annexb.temporal_unit_bytes_left -= current_obu_total_size;
+
+    if (priv->annexb.frame_unit_bytes_left < current_obu_total_size)
+      return GST_AV1_PARSER_BITSTREAM_ERROR;
+    priv->annexb.frame_unit_bytes_left -= current_obu_total_size;
+
+    if (priv->annexb.temporal_unit_bytes_left == 0) {
+      if (priv->annexb.frame_unit_bytes_left != 0)
+        return GST_AV1_PARSER_BITSTREAM_ERROR;
+      retval =
+          gst_av1_parse_annexb_temporal_and_frame_unit_size (parser,
+          priv->current_chunk.data, offset, priv->current_chunk.size,
+          &bytes_consumed);
+      GST_AV1_EVAL_RETVAL_LOGGED (retval);
+    } else if (priv->annexb.frame_unit_bytes_left == 0) {
+      retval =
+          gst_av1_parse_annexb_frame_unit_size (parser,
+          priv->current_chunk.data, offset, priv->current_chunk.size,
+          &bytes_consumed);
+      GST_AV1_EVAL_RETVAL_LOGGED (retval);
+    }
+  }
+
+  return gst_av1_parse_get_obu (parser, priv->current_chunk.data,
+      offset + bytes_consumed, priv->current_chunk.size, obu);
+}
 
 static GstAV1ParserResult
 gst_av1_parse_color_config (GstAV1Parser * parser, GstBitReader * br,
     GstAV1ColorConfig * color_config)
 {
+  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
   GstAV1SequenceHeaderOBU *seq_header;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   color_config->high_bitdepth = gst_av1_read_bit (br);
   if (seq_header->seq_profile == 2 && color_config->high_bitdepth) {
     color_config->twelve_bit = gst_av1_read_bit (br);
@@ -510,16 +656,13 @@ gst_av1_parse_color_config (GstAV1Parser * parser, GstBitReader * br,
     color_config->bit_depth = color_config->high_bitdepth ? 10 : 8;
   }
 
-  /* duplicate variables into parser struct */
-  parser->bit_depth = color_config->bit_depth;
-
+  /* duplicate variables into private parser struct */
+  priv->bit_depth = color_config->bit_depth;
   if (seq_header->seq_profile == 1)
     color_config->mono_chrome = 0;
   else
     color_config->mono_chrome = gst_av1_read_bit (br);
-
   color_config->num_planes = color_config->mono_chrome ? 1 : 3;
-
   color_config->color_description_present_flag = gst_av1_read_bit (br);
   if (color_config->color_description_present_flag) {
     color_config->color_primaries = gst_av1_read_bits (br, 8);
@@ -537,11 +680,12 @@ gst_av1_parse_color_config (GstAV1Parser * parser, GstBitReader * br,
     color_config->subsampling_y = 1;
     color_config->chroma_sample_position = GST_AV1_CSP_UNKNOWN;
     color_config->separate_uv_delta_q = 0;
-    /* duplicate variables into parser struct */
-    parser->subsampling_x = color_config->subsampling_x;
-    parser->subsampling_y = color_config->subsampling_y;
+    /* duplicate variables into private parser struct */
+    priv->subsampling_x = color_config->subsampling_x;
+    priv->subsampling_y = color_config->subsampling_y;
     return GST_AV1_PARSER_OK;
-  } else if (color_config->color_primaries == GST_AV1_CP_BT_709 &&
+  } else
+      if (color_config->color_primaries == GST_AV1_CP_BT_709 &&
       color_config->transfer_characteristics == GST_AV1_TC_SRGB &&
       color_config->matrix_coefficients == GST_AV1_MC_IDENTITY) {
     color_config->color_range = 1;
@@ -572,11 +716,9 @@ gst_av1_parse_color_config (GstAV1Parser * parser, GstBitReader * br,
   }
 
   color_config->separate_uv_delta_q = gst_av1_read_bit (br);
-
-  /* duplicate variables into parser struct */
-  parser->subsampling_x = color_config->subsampling_x;
-  parser->subsampling_y = color_config->subsampling_y;
-
+  /* duplicate variables into private parser struct */
+  priv->subsampling_x = color_config->subsampling_x;
+  priv->subsampling_y = color_config->subsampling_y;
   return GST_AV1_PARSER_OK;
 }
 
@@ -585,9 +727,7 @@ gst_av1_parse_timing_info (GstAV1Parser * parser, GstBitReader * br,
     GstAV1TimingInfo * timing_info)
 {
   GstAV1ParserResult retval;
-
   GST_AV1_DEBUG ();
-
   timing_info->num_units_in_display_tick = gst_av1_read_bits (br, 32);
   timing_info->time_scale = gst_av1_read_bits (br, 32);
   timing_info->equal_picture_interval = gst_av1_read_bit (br);
@@ -606,14 +746,12 @@ gst_av1_parse_decoder_model_info (GstAV1Parser * parser, GstBitReader * br,
     GstAV1DecoderModelInfo * decoder_model_info)
 {
   GST_AV1_DEBUG ();
-
   decoder_model_info->buffer_delay_length_minus_1 = gst_av1_read_bits (br, 5);
   decoder_model_info->num_units_in_decoding_tick = gst_av1_read_bits (br, 32);
   decoder_model_info->buffer_removal_time_length_minus_1 =
       gst_av1_read_bits (br, 5);
   decoder_model_info->frame_presentation_time_length_minus_1 =
       gst_av1_read_bits (br, 5);
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -622,15 +760,12 @@ gst_av1_parse_operating_parameters_info (GstAV1Parser * parser,
     GstBitReader * br, GstAV1OperatingPoint * op_point)
 {
   GstAV1SequenceHeaderOBU *seq_header;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   op_point->decoder_buffer_delay =
       gst_av1_read_bits (br,
       seq_header->decoder_model_info.buffer_delay_length_minus_1 + 1);
@@ -638,7 +773,6 @@ gst_av1_parse_operating_parameters_info (GstAV1Parser * parser,
       gst_av1_read_bits (br,
       seq_header->decoder_model_info.buffer_delay_length_minus_1 + 1);
   op_point->low_delay_mode_flag = gst_av1_read_bit (br);
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -649,18 +783,13 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
   GstAV1ParserResult retval;
   GstBitReader br;
   gint i;
-
   GST_AV1_DEBUG ();
-
   memset (seq_header, 0, sizeof (GstAV1SequenceHeaderOBU));
   parser->seq_header = seq_header;
-
   gst_bit_reader_init (&br, obu->data, obu->size);
-
   seq_header->seq_profile = gst_av1_read_bits (&br, 3);
   seq_header->still_picture = gst_av1_read_bit (&br);
   seq_header->reduced_still_picture_header = gst_av1_read_bit (&br);
-
   if (seq_header->reduced_still_picture_header) {
     seq_header->timing_info_present_flag = 0;
     seq_header->decoder_model_info_present_flag = 0;
@@ -674,12 +803,10 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
         0;
   } else {
     seq_header->timing_info_present_flag = gst_av1_read_bit (&br);
-
     if (seq_header->timing_info_present_flag) {
       retval =
           gst_av1_parse_timing_info (parser, &br, &(seq_header->timing_info));
       GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
       seq_header->decoder_model_info_present_flag = gst_av1_read_bit (&br);
       if (seq_header->decoder_model_info_present_flag) {
         retval =
@@ -693,7 +820,6 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
 
     seq_header->initial_display_delay_present_flag = gst_av1_read_bit (&br);
     seq_header->operating_points_cnt_minus_1 = gst_av1_read_bits (&br, 5);
-
     for (i = 0; i <= seq_header->operating_points_cnt_minus_1; i++) {
       seq_header->operating_points[i].idc = gst_av1_read_bits (&br, 12);
       seq_header->operating_points[i].seq_level_idx =
@@ -735,12 +861,10 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
       gst_av1_read_bits (&br, seq_header->frame_width_bits_minus_1 + 1);
   seq_header->max_frame_height_minus_1 =
       gst_av1_read_bits (&br, seq_header->frame_height_bits_minus_1 + 1);
-
   if (seq_header->reduced_still_picture_header)
     seq_header->frame_id_numbers_present_flag = 0;
   else
     seq_header->frame_id_numbers_present_flag = gst_av1_read_bit (&br);
-
   if (seq_header->frame_id_numbers_present_flag) {
     seq_header->delta_frame_id_length_minus_2 = gst_av1_read_bits (&br, 4);
     seq_header->additional_frame_id_length_minus_1 = gst_av1_read_bits (&br, 3);
@@ -749,7 +873,6 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
   seq_header->use_128x128_superblock = gst_av1_read_bit (&br);
   seq_header->enable_filter_intra = gst_av1_read_bit (&br);
   seq_header->enable_intra_edge_filter = gst_av1_read_bit (&br);
-
   if (seq_header->reduced_still_picture_header) {
     seq_header->enable_interintra_compound = 0;
     seq_header->enable_masked_compound = 0;
@@ -781,7 +904,6 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
           GST_AV1_SELECT_SCREEN_CONTENT_TOOLS;
     else
       seq_header->seq_force_screen_content_tools = gst_av1_read_bit (&br);
-
     if (seq_header->seq_force_screen_content_tools > 0) {
       seq_header->seq_choose_integer_mv = gst_av1_read_bit (&br);
       if (seq_header->seq_choose_integer_mv)
@@ -801,13 +923,10 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
   seq_header->enable_superres = gst_av1_read_bit (&br);
   seq_header->enable_cdef = gst_av1_read_bit (&br);
   seq_header->enable_restoration = gst_av1_read_bit (&br);
-
   retval =
       gst_av1_parse_color_config (parser, &br, &(seq_header->color_config));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   seq_header->film_grain_params_present = gst_av1_read_bit (&br);
-
   /* return gst_av1_skip_trailing_bits (parser, &br); */
   return GST_AV1_PARSER_OK;
 }
@@ -816,9 +935,7 @@ GstAV1ParserResult
 gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstAV1OBU * obu)
 {
   GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
-
   GST_AV1_DEBUG ();
-
   if (obu->header.obu_type == GST_AV1_OBU_TEMPORAL_DELIMITER) {
     priv->seen_frame_header = 0;
     return GST_AV1_PARSER_OK;
@@ -833,7 +950,6 @@ gst_av1_parse_metadata_itut_t35 (GstAV1Parser * parser, GstBitReader * br,
     GstAV1MetadataITUT_T35 * itut_t35)
 {
   GST_AV1_DEBUG ();
-
   itut_t35->itu_t_t35_country_code = gst_av1_read_bits (br, 8);
   if (itut_t35->itu_t_t35_country_code) {
     itut_t35->itu_t_t35_country_code_extention_byte = gst_av1_read_bits (br, 8);
@@ -850,10 +966,8 @@ gst_av1_parse_metadata_hdr_cll (GstAV1Parser * parser, GstBitReader * br,
     GstAV1MetadataHdrCll * hdr_cll)
 {
   GST_AV1_DEBUG ();
-
   hdr_cll->max_cll = gst_av1_read_bits (br, 16);
   hdr_cll->max_fall = gst_av1_read_bits (br, 16);
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -862,9 +976,7 @@ gst_av1_parse_metadata_hdr_mdcv (GstAV1Parser * parser, GstBitReader * br,
     GstAV1MetadataHdrMdcv * hdr_mdcv)
 {
   gint i;
-
   GST_AV1_DEBUG ();
-
   for (i = 0; i < 3; i++) {
     hdr_mdcv->primary_chromaticity_x[i] = gst_av1_read_bits (br, 16);
     hdr_mdcv->primary_chromaticity_y[i] = gst_av1_read_bits (br, 16);
@@ -872,21 +984,17 @@ gst_av1_parse_metadata_hdr_mdcv (GstAV1Parser * parser, GstBitReader * br,
 
   hdr_mdcv->white_point_chromaticity_x = gst_av1_read_bits (br, 16);
   hdr_mdcv->white_point_chromaticity_y = gst_av1_read_bits (br, 16);
-
   hdr_mdcv->luminance_max = gst_av1_read_bits (br, 32);
   hdr_mdcv->luminance_min = gst_av1_read_bits (br, 32);
-
   return GST_AV1_PARSER_OK;
 }
 
 static GstAV1ParserResult
-gst_av1_parse_metadata_scalability (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1MetadataScalability * scalability)
+gst_av1_parse_metadata_scalability (GstAV1Parser * parser,
+    GstBitReader * br, GstAV1MetadataScalability * scalability)
 {
   gint i, j;
-
   GST_AV1_DEBUG ();
-
   scalability->scalability_mode_idc = gst_av1_read_bits (br, 8);
   if (scalability->scalability_mode_idc == GST_AV1_SCALABILITY_SS) {
     scalability->spatial_layers_cnt_minus_1 = gst_av1_read_bits (br, 2);
@@ -932,13 +1040,11 @@ gst_av1_parse_metadata_timecode (GstAV1Parser * parser, GstBitReader * br,
     GstAV1MetadataTimecode * timecode)
 {
   GST_AV1_DEBUG ();
-
   timecode->counting_type = gst_av1_read_bits (br, 5);
   timecode->full_timestamp_flag = gst_av1_read_bit (br);
   timecode->discontinuity_flag = gst_av1_read_bit (br);
   timecode->cnt_dropped_flag = gst_av1_read_bit (br);
   timecode->n_frames = gst_av1_read_bits (br, 9);
-
   if (timecode->full_timestamp_flag) {
     timecode->seconds_value = gst_av1_read_bits (br, 6);
     timecode->minutes_value = gst_av1_read_bits (br, 6);
@@ -972,17 +1078,11 @@ gst_av1_parse_metadata_obu (GstAV1Parser * parser, GstAV1OBU * obu,
 {
   GstAV1ParserResult retval;
   GstBitReader br;
-
   GST_AV1_DEBUG ();
-
   memset (metadata, 0, sizeof (GstAV1MetadataOBU));
-
   gst_bit_reader_init (&br, obu->data, obu->size);
-
   metadata->metadata_type = gst_av1_bitstreamfn_leb128 (&br, &retval);
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   switch (metadata->metadata_type) {
     case GST_AV1_METADATA_TYPE_ITUT_T35:
       retval =
@@ -1010,7 +1110,6 @@ gst_av1_parse_metadata_obu (GstAV1Parser * parser, GstAV1OBU * obu,
   }
 
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   /*return gst_av1_skip_trailing_bits (parser, br); */
   return GST_AV1_PARSER_OK;
 }
@@ -1021,15 +1120,12 @@ gst_av1_parse_superres_params_compute_image_size (GstAV1Parser * parser,
     GstBitReader * br, GstAV1FrameHeaderOBU * frame_header)
 {
   GstAV1SequenceHeaderOBU *seq_header;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   /* superres_params() */
   if (seq_header->enable_superres) {
     frame_header->use_superres = gst_av1_read_bit (br);
@@ -1049,11 +1145,9 @@ gst_av1_parse_superres_params_compute_image_size (GstAV1Parser * parser,
   frame_header->frame_width =
       (frame_header->upscaled_width * GST_AV1_SUPERRES_NUM +
       (frame_header->superres_denom / 2)) / frame_header->superres_denom;
-
   /* compute_image_size() */
   frame_header->mi_cols = 2 * ((frame_header->frame_width + 7) >> 3);
   frame_header->mi_rows = 2 * ((frame_header->frame_height + 7) >> 3);
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -1063,15 +1157,12 @@ gst_av1_parse_frame_size (GstAV1Parser * parser, GstBitReader * br,
 {
   GstAV1ParserResult retval;
   GstAV1SequenceHeaderOBU *seq_header;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   if (frame_header->frame_size_override_flag) {
     frame_header->frame_width_minus_1 =
         gst_av1_read_bits (br, seq_header->frame_width_bits_minus_1 + 1);
@@ -1088,8 +1179,6 @@ gst_av1_parse_frame_size (GstAV1Parser * parser, GstBitReader * br,
       gst_av1_parse_superres_params_compute_image_size (parser, br,
       frame_header);
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -1098,7 +1187,6 @@ gst_av1_parse_render_size (GstAV1Parser * parser, GstBitReader * br,
     GstAV1FrameHeaderOBU * frame_header)
 {
   GST_AV1_DEBUG ();
-
   frame_header->render_and_frame_size_different = gst_av1_read_bit (br);
   if (frame_header->render_and_frame_size_different) {
     frame_header->render_width_minus_1 = gst_av1_read_bits (br, 16);
@@ -1114,17 +1202,14 @@ gst_av1_parse_render_size (GstAV1Parser * parser, GstBitReader * br,
 }
 
 static GstAV1ParserResult
-gst_av1_parse_frame_size_with_refs (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1FrameHeaderOBU * frame_header)
+gst_av1_parse_frame_size_with_refs (GstAV1Parser * parser,
+    GstBitReader * br, GstAV1FrameHeaderOBU * frame_header)
 {
   GstAV1ParserResult retval;
   GstAV1ReferenceFrameInfo *ref_info;
   gint i;
-
   ref_info = &(parser->ref_info);
-
   GST_AV1_DEBUG ();
-
   for (i = 0; i < GST_AV1_REFS_PER_FRAME; i++) {
     frame_header->found_ref = gst_av1_read_bit (br);
     if (frame_header->found_ref == 1) {
@@ -1141,10 +1226,8 @@ gst_av1_parse_frame_size_with_refs (GstAV1Parser * parser, GstBitReader * br,
   if (frame_header->found_ref == 0) {
     retval = gst_av1_parse_frame_size (parser, br, frame_header);
     GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
     retval = gst_av1_parse_render_size (parser, br, frame_header);
     GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   } else {
     retval =
         gst_av1_parse_superres_params_compute_image_size (parser, br,
@@ -1153,7 +1236,6 @@ gst_av1_parse_frame_size_with_refs (GstAV1Parser * parser, GstBitReader * br,
   }
 
   return GST_AV1_PARSER_OK;
-
 }
 
 
@@ -1163,21 +1245,15 @@ gst_av1_parse_quantization_params (GstAV1Parser * parser, GstBitReader * br,
 {
   GstAV1ParserResult retval;
   GstAV1ColorConfig *color_config;
-
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   color_config = &(parser->seq_header->color_config);
-
   quant_params->base_q_idx = gst_av1_read_bits (br, 8);
-
   quant_params->delta_q_ydc = gst_av1_bitstreamfn_delta_q (br, &retval);
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   if (color_config->num_planes > 1) {
     if (color_config->separate_uv_delta_q) {
       quant_params->diff_uv_delta = gst_av1_read_bit (br);
@@ -1188,14 +1264,11 @@ gst_av1_parse_quantization_params (GstAV1Parser * parser, GstBitReader * br,
     GST_AV1_EVAL_RETVAL_LOGGED (retval);
     quant_params->delta_q_uac = gst_av1_bitstreamfn_delta_q (br, &retval);
     GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
     if (quant_params->diff_uv_delta) {
       quant_params->delta_q_vdc = gst_av1_bitstreamfn_delta_q (br, &retval);
       GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
       quant_params->delta_q_vac = gst_av1_bitstreamfn_delta_q (br, &retval);
       GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
     } else {
       quant_params->delta_q_vdc = quant_params->delta_q_udc;
       quant_params->delta_q_vac = quant_params->delta_q_uac;
@@ -1208,11 +1281,9 @@ gst_av1_parse_quantization_params (GstAV1Parser * parser, GstBitReader * br,
   }
 
   quant_params->using_qmatrix = gst_av1_read_bit (br);
-
   if (quant_params->using_qmatrix) {
     quant_params->qm_y = gst_av1_read_bits (br, 4);
     quant_params->qm_u = gst_av1_read_bits (br, 4);
-
     if (!color_config->separate_uv_delta_q) {
       quant_params->qm_v = quant_params->qm_u;
     } else {
@@ -1230,28 +1301,24 @@ gst_av1_parse_segmentation_params (GstAV1Parser * parser, GstBitReader * br,
   gint i, j;
   GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
-  const guint8 segmentation_feature_bits[GST_AV1_SEG_LVL_MAX] =
-      { 8, 6, 6, 6, 6, 3, 0, 0 };
-  const guint8 segmentation_feature_signed[GST_AV1_SEG_LVL_MAX] =
-      { 1, 1, 1, 1, 1, 0, 0, 0 };
-  const guint8 segmentation_feature_max[GST_AV1_SEG_LVL_MAX] =
-      { 255, GST_AV1_MAX_LOOP_FILTER, GST_AV1_MAX_LOOP_FILTER,
+  const guint8 segmentation_feature_bits[GST_AV1_SEG_LVL_MAX] = {
+    8, 6, 6, 6, 6, 3, 0, 0
+  };
+  const guint8 segmentation_feature_signed[GST_AV1_SEG_LVL_MAX] = {
+    1, 1, 1, 1, 1, 0, 0, 0
+  };
+  const guint8 segmentation_feature_max[GST_AV1_SEG_LVL_MAX] = {
+    255, GST_AV1_MAX_LOOP_FILTER, GST_AV1_MAX_LOOP_FILTER,
     GST_AV1_MAX_LOOP_FILTER, GST_AV1_MAX_LOOP_FILTER, 7, 0, 0
   };
   gint clipped_value, feature_value;
-
   GST_AV1_DEBUG ();
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   seg_params->segmentation_enabled = gst_av1_read_bit (br);
-
-
-
   if (seg_params->segmentation_enabled) {
     if (frame_header->primary_ref_frame == GST_AV1_PRIMARY_REF_NONE) {
       seg_params->segmentation_update_map = 1;
@@ -1320,7 +1387,6 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
   gboolean uniform_tile_spacing_flag;
-
   gint i;
   gint start_sb;
   gint sb_cols;
@@ -1343,22 +1409,17 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
   gint tile_size_bytes_minus_1;
   gint size_sb;
   gint widest_tile_sb;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   sb_cols =
       seq_header->use_128x128_superblock ? ((frame_header->mi_cols +
           31) >> 5) : ((frame_header->mi_cols + 15) >> 4);
@@ -1376,7 +1437,6 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
           GST_AV1_MAX_TILE_ROWS));
   min_log2_tiles = MAX (min_log2_tile_cols,
       gst_av1_helper_TileLog2 (max_tile_area_sb, sb_rows * sb_cols));
-
   uniform_tile_spacing_flag = gst_av1_read_bit (br);
   if (uniform_tile_spacing_flag) {
     tile_info->tile_cols_log2 = min_log2_tile_cols;
@@ -1397,7 +1457,6 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
     }
     tile_info->mi_col_starts[i] = frame_header->mi_cols;
     tile_info->tile_cols = i;
-
     min_log2_tile_rows = MAX (min_log2_tiles - tile_info->tile_cols_log2, 0);
     max_tile_height_sb = sb_rows >> min_log2_tile_rows;
     tile_info->tile_rows_log2 = min_log2_tile_rows;
@@ -1434,15 +1493,11 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
     tile_info->tile_cols = i;
     tile_info->tile_cols_log2 =
         gst_av1_helper_TileLog2 (1, tile_info->tile_cols);
-
     if (min_log2_tiles > 0)
       max_tile_area_sb = (sb_rows * sb_cols) >> (min_log2_tiles + 1);
     else
       max_tile_area_sb = sb_rows * sb_cols;
-
     max_tile_height_sb = MAX (max_tile_area_sb / widest_tile_sb, 1);
-
-
     start_sb = 0;
     for (i = 0; start_sb < sb_rows; i++) {
       tile_info->mi_row_starts[i] = start_sb << sb_shift;
@@ -1479,22 +1534,17 @@ gst_av1_parse_loop_filter_params (GstAV1Parser * parser, GstBitReader * br,
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1ColorConfig *color_config;
   gint i;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   color_config = &(parser->seq_header->color_config);
-
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   if (frame_header->coded_lossless || frame_header->allow_intrabc) {
     lf_params->loop_filter_level[0] = 0;
     lf_params->loop_filter_level[1] = 0;
@@ -1522,7 +1572,6 @@ gst_av1_parse_loop_filter_params (GstAV1Parser * parser, GstBitReader * br,
   }
   lf_params->loop_filter_sharpness = gst_av1_read_bits (br, 3);
   lf_params->loop_filter_delta_enabled = gst_av1_read_bit (br);
-
   if (lf_params->loop_filter_delta_enabled) {
     lf_params->loop_filter_delta_update = gst_av1_read_bit (br);
     if (lf_params->loop_filter_delta_update) {
@@ -1553,7 +1602,6 @@ gst_av1_parse_quantizer_index_delta_params (GstAV1Parser * parser,
     GstBitReader * br, GstAV1QuantizationParams * quant_params)
 {
   GST_AV1_DEBUG ();
-
   quant_params->delta_q_res = 0;
   quant_params->delta_q_present = 0;
   if (quant_params->base_q_idx > 0) {
@@ -1571,19 +1619,15 @@ gst_av1_parse_loop_filter_delta_params (GstAV1Parser * parser,
     GstBitReader * br, GstAV1LoopFilterParams * lf_params)
 {
   GstAV1FrameHeaderOBU *frame_header;
-
   GST_AV1_DEBUG ();
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   lf_params->delta_lf_present = 0;
   lf_params->delta_lf_res = 0;
   lf_params->delta_lf_multi = 0;
-
   if (lf_params->delta_lf_present) {
     if (!frame_header->allow_intrabc)
       lf_params->delta_lf_present = gst_av1_read_bit (br);
@@ -1603,21 +1647,17 @@ gst_av1_parse_cdef_params (GstAV1Parser * parser, GstBitReader * br,
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
   gint i;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   if (frame_header->coded_lossless || frame_header->allow_intrabc
       || !seq_header->enable_cdef) {
     cdef_params->cdef_bits = 0;
@@ -1649,34 +1689,28 @@ gst_av1_parse_cdef_params (GstAV1Parser * parser, GstBitReader * br,
 }
 
 static GstAV1ParserResult
-gst_av1_parse_loop_restoration_params (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1LoopRestorationParams * lr_params)
+gst_av1_parse_loop_restoration_params (GstAV1Parser * parser,
+    GstBitReader * br, GstAV1LoopRestorationParams * lr_params)
 {
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
   guint8 lr_type;
   gint i;
   const GstAV1FrameRestorationType remap_lr_type[4] = {
-    GST_AV1_FRAME_RESTORE_NONE,
-    GST_AV1_FRAME_RESTORE_SWITCHABLE,
-    GST_AV1_FRAME_RESTORE_WIENER,
-    GST_AV1_FRAME_RESTORE_SGRPROJ
+    GST_AV1_FRAME_RESTORE_NONE, GST_AV1_FRAME_RESTORE_SWITCHABLE,
+    GST_AV1_FRAME_RESTORE_WIENER, GST_AV1_FRAME_RESTORE_SGRPROJ
   };
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   if (frame_header->all_lossless || frame_header->allow_intrabc
       || !seq_header->enable_restoration) {
     lr_params->frame_restoration_type[0] = GST_AV1_FRAME_RESTORE_NONE;
@@ -1735,7 +1769,6 @@ gst_av1_parse_tx_mode (GstAV1Parser * parser, GstBitReader * br,
     GstAV1FrameHeaderOBU * frame_header)
 {
   GST_AV1_DEBUG ();
-
   if (frame_header->coded_lossless == 1) {
     frame_header->tx_mode = GST_AV1_TX_MODE_ONLY_4x4;
   } else {
@@ -1753,10 +1786,8 @@ static gint
 gst_av1_get_relative_dist (GstAV1SequenceHeaderOBU * seq_header, gint a, gint b)
 {
   gint m, diff;
-
   if (!seq_header->enable_order_hint)
     return 0;
-
   diff = a - b;
   m = 1 << seq_header->order_hint_bits_minus_1;
   diff = (diff & (m - 1)) - (diff & m);
@@ -1778,26 +1809,20 @@ gst_av1_parse_skip_mode_params (GstAV1Parser * parser, GstBitReader * br,
   gint ref_hint;
   gint second_forward_idx;
   gint second_forward_hint;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   ref_info = &(parser->ref_info);
-
   skip_mode_allowed = 0;
-
   if (frame_header->frame_is_intra || !frame_header->reference_select
       || !seq_header->enable_order_hint) {
     frame_header->skip_mode_allowed = 0;
   } else {
     forward_idx = -1;
     backward_idx = -1;
-
     for (i = 0; i < GST_AV1_REFS_PER_FRAME; i++) {
       ref_hint = ref_info->entry[frame_header->ref_frame_idx[i]].ref_order_hint;
       if (gst_av1_get_relative_dist (parser->seq_header, ref_hint,
@@ -1808,7 +1833,8 @@ gst_av1_parse_skip_mode_params (GstAV1Parser * parser, GstBitReader * br,
           forward_idx = i;
           forward_hint = ref_hint;
         }
-      } else if (gst_av1_get_relative_dist (parser->seq_header, ref_hint,
+      } else
+          if (gst_av1_get_relative_dist (parser->seq_header, ref_hint,
               frame_header->order_hint) > 0) {
         if (backward_idx < 0
             || gst_av1_get_relative_dist (parser->seq_header, ref_hint,
@@ -1875,9 +1901,7 @@ gst_av1_decode_subexp (GstBitReader * br, gint numSyms,
   gint subexp_final_bits = 0;
   gint subexp_more_bits = 0;
   gint subexp_bits = 0;
-
   GST_AV1_DEBUG ();
-
 /*TODO: can while(1) be dangerous??*/
   while (1) {
     gint b2 = i ? k + i - 1 : k;
@@ -1911,7 +1935,6 @@ gst_av1_decode_unsigned_subexp_with_ref (GstBitReader * br, gint mx, gint r,
 {
   gint v;
   GST_AV1_DEBUG ();
-
   v = gst_av1_decode_subexp (br, mx, retval);
   if ((r << 1) <= mx) {
     return gst_av1_helper_InverseRecenter (r, v);
@@ -1921,12 +1944,11 @@ gst_av1_decode_unsigned_subexp_with_ref (GstBitReader * br, gint mx, gint r,
 }
 
 static gint
-gst_av1_decode_signed_subexp_with_ref (GstBitReader * br, gint low, gint high,
-    gint r, GstAV1ParserResult * retval)
+gst_av1_decode_signed_subexp_with_ref (GstBitReader * br, gint low,
+    gint high, gint r, GstAV1ParserResult * retval)
 {
 
   GST_AV1_DEBUG ();
-
   return gst_av1_decode_unsigned_subexp_with_ref (br, high - low, r - low,
       retval) + low;
 }
@@ -1935,8 +1957,8 @@ gst_av1_decode_signed_subexp_with_ref (GstBitReader * br, gint low, gint high,
 /*Hack-Warning: PrevGMParams[] are not implemented yet - parser should read right amount of bits, but value will be wrong.*/
 static GstAV1ParserResult
 gst_av1_parse_global_param (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1GlobalMotionParams * gm_params, GstAV1WarpModelType type, gint ref,
-    gint idx)
+    GstAV1GlobalMotionParams * gm_params, GstAV1WarpModelType type,
+    gint ref, gint idx)
 {
   GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
@@ -1944,15 +1966,12 @@ gst_av1_parse_global_param (GstAV1Parser * parser, GstBitReader * br,
   gint abs_bits;
   gint prec_bits;
   /*gint sub; */
-
   GST_AV1_DEBUG ();
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   abs_bits = GST_AV1_GM_ABS_ALPHA_BITS;
   prec_bits = GST_AV1_GM_ALPHA_PREC_BITS;
   if (idx < 2) {
@@ -1979,27 +1998,23 @@ gst_av1_parse_global_param (GstAV1Parser * parser, GstBitReader * br,
       (gst_av1_decode_signed_subexp_with_ref (br, -mx, mx + 1, r,
           &retval) << prec_diff) + wm_round;
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   return GST_AV1_PARSER_OK;
 }
 
 
 static GstAV1ParserResult
-gst_av1_parse_global_motion_params (GstAV1Parser * parser, GstBitReader * br,
-    GstAV1GlobalMotionParams * gm_params)
+gst_av1_parse_global_motion_params (GstAV1Parser * parser,
+    GstBitReader * br, GstAV1GlobalMotionParams * gm_params)
 {
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1WarpModelType type;
   gint i, ref;
-
   GST_AV1_DEBUG ();
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   for (ref = GST_AV1_REF_LAST_FRAME; ref <= GST_AV1_REF_ALTREF_FRAME; ref++) {
     gm_params->gm_type[ref] = GST_AV1_WARP_MODEL_IDENTITY;
     for (i = 0; i < 6; i++) {
@@ -2010,7 +2025,6 @@ gst_av1_parse_global_motion_params (GstAV1Parser * parser, GstBitReader * br,
 
   if (frame_header->frame_is_intra)
     return GST_AV1_PARSER_OK;
-
   for (ref = GST_AV1_REF_LAST_FRAME; ref <= GST_AV1_REF_ALTREF_FRAME; ref++) {
     gm_params->is_global[ref] = gst_av1_read_bit (br);
     if (gm_params->is_global[ref]) {
@@ -2027,7 +2041,6 @@ gst_av1_parse_global_motion_params (GstAV1Parser * parser, GstBitReader * br,
       type = GST_AV1_WARP_MODEL_IDENTITY;
     }
     gm_params->gm_type[ref] = type;
-
     if (type >= GST_AV1_WARP_MODEL_ROTZOOM) {
       gst_av1_parse_global_param (parser, br, gm_params, type, ref, 2);
       gst_av1_parse_global_param (parser, br, gm_params, type, ref, 3);
@@ -2057,21 +2070,17 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
   GstAV1SequenceHeaderOBU *seq_header;
   gint i;
   gint num_pos_chroma, num_pos_luma;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   if (!seq_header->film_grain_params_present || (!frame_header->show_frame
           && !frame_header->showable_frame)) {
     /*reset_grain_params() TODO: implement reset_grain_params */
@@ -2079,14 +2088,12 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
   }
 
   fg_params->apply_grain = gst_av1_read_bit (br);
-
   if (!fg_params->apply_grain) {
     /*reset_grain_params() TODO: impl. */
     return GST_AV1_PARSER_OK;
   }
 
   fg_params->grain_seed = gst_av1_read_bits (br, 16);
-
   if (frame_header->frame_type == GST_AV1_INTER_FRAME) {
     fg_params->update_grain = gst_av1_read_bit (br);
   } else {
@@ -2095,7 +2102,6 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
 
   if (!fg_params->update_grain) {
     fg_params->film_grain_params_ref_idx = gst_av1_read_bits (br, 3);
-
     /* TODO- look at the following:
        tempGrainSeed = grain_seed
        load_grain_params( film_grain_params_ref_idx )
@@ -2105,7 +2111,6 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
   }
 
   fg_params->num_y_points = gst_av1_read_bits (br, 4);
-
   for (i = 0; i < fg_params->num_y_points; i++) {
     fg_params->point_y_value[i] = gst_av1_read_bits (br, 8);
     fg_params->point_y_scaling[i] = gst_av1_read_bits (br, 8);
@@ -2161,7 +2166,6 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
 
   fg_params->ar_coeff_shift_minus_6 = gst_av1_read_bits (br, 2);
   fg_params->grain_scale_shift = gst_av1_read_bits (br, 2);
-
   if (fg_params->num_cb_points) {
     fg_params->cb_mult = gst_av1_read_bits (br, 8);
     fg_params->cb_luma_mult = gst_av1_read_bits (br, 8);
@@ -2176,7 +2180,6 @@ gst_av1_parse_film_grain_params (GstAV1Parser * parser, GstBitReader * br,
 
   fg_params->overlap_flag = gst_av1_read_bit (br);
   fg_params->clip_to_restricted_range = gst_av1_read_bit (br);
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -2187,29 +2190,23 @@ gst_av1_mark_ref_frames (GstAV1Parser * parser, GstBitReader * br, gint id_len)
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1SequenceHeaderOBU *seq_header;
   gint i, diff_len;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   ref_info = &(parser->ref_info);
-
-
   diff_len = seq_header->delta_frame_id_length_minus_2 + 2;
   for (i = 0; i < GST_AV1_NUM_REF_FRAMES; i++) {
     if (frame_header->current_frame_id > (1 << diff_len)) {
-      if (ref_info->entry[i].ref_frame_id > frame_header->current_frame_id ||
-          ref_info->entry[i].ref_frame_id <
+      if (ref_info->entry[i].ref_frame_id > frame_header->current_frame_id
+          || ref_info->entry[i].ref_frame_id <
           (frame_header->current_frame_id - (1 << diff_len)))
         ref_info->entry[i].ref_valid = 0;
     } else {
@@ -2226,8 +2223,8 @@ gst_av1_mark_ref_frames (GstAV1Parser * parser, GstBitReader * br, gint id_len)
 
 
 static gint
-gst_av1_get_qindex_ignoreDeltaQ (GstAV1QuantizationParams * quantization_params,
-    gint segment_id)
+gst_av1_get_qindex_ignoreDeltaQ (GstAV1QuantizationParams *
+    quantization_params, gint segment_id)
 {
   /* This only handles the ignorDeltaQ case */
   return quantization_params->base_q_idx;
@@ -2244,27 +2241,20 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
   GstAV1SequenceHeaderOBU *seq_header;
   gint i, op_num, segment_id, all_frames;
   gint id_len = 0;
-
   GST_AV1_DEBUG ();
-
   if (!parser->seq_header) {
     GST_LOG ("Missing OBU Reference: seq_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   seq_header = parser->seq_header;
-
   ref_info = &(parser->ref_info);
-
   memset (frame_header, 0, sizeof (GstAV1FrameHeaderOBU));
   parser->frame_header = frame_header;
-
   if (seq_header->frame_id_numbers_present_flag)
     id_len =
         seq_header->additional_frame_id_length_minus_1 +
         seq_header->delta_frame_id_length_minus_2 + 3;
-
   all_frames = (1 << GST_AV1_NUM_REF_FRAMES) - 1;
-
   if (seq_header->reduced_still_picture_header) {
     frame_header->show_existing_frame = 0;
     frame_header->frame_type = GST_AV1_KEY_FRAME;
@@ -2289,7 +2279,6 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
 
       frame_header->frame_type =
           ref_info->entry[frame_header->frame_to_show_map_idx].ref_frame_type;
-
       if (frame_header->frame_type == GST_AV1_KEY_FRAME) {
         frame_header->refresh_frame_flags = all_frames;
       }
@@ -2304,19 +2293,18 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
         (frame_header->frame_type == GST_AV1_INTRA_ONLY_FRAME
         || frame_header->frame_type == GST_AV1_KEY_FRAME);
     frame_header->show_frame = gst_av1_read_bit (br);
-    if (frame_header->show_frame && seq_header->decoder_model_info_present_flag
+    if (frame_header->show_frame
+        && seq_header->decoder_model_info_present_flag
         && !seq_header->timing_info.equal_picture_interval)
       /*inline temporal_point_info */
       frame_header->frame_presentation_time =
           gst_av1_read_bits (br,
           seq_header->
           decoder_model_info.frame_presentation_time_length_minus_1 + 1);
-
     if (frame_header->show_frame)
       frame_header->showable_frame = 0;
     else
       frame_header->showable_frame = gst_av1_read_bit (br);
-
     if (frame_header->frame_type == GST_AV1_SWITCH_FRAME
         || (frame_header->frame_type == GST_AV1_KEY_FRAME
             && frame_header->show_frame))
@@ -2337,7 +2325,6 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
   }
 
   frame_header->disable_cdf_update = gst_av1_read_bit (br);
-
   if (seq_header->seq_force_screen_content_tools ==
       GST_AV1_SELECT_SCREEN_CONTENT_TOOLS) {
     frame_header->allow_screen_content_tools = gst_av1_read_bit (br);
@@ -2378,7 +2365,6 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
   frame_header->order_hint =
       gst_av1_read_bits (br, seq_header->order_hint_bits_minus_1 + 1);
   /*OrderHint = order_hint */
-
   if (frame_header->frame_is_intra || frame_header->error_resilient_mode) {
     frame_header->primary_ref_frame = GST_AV1_PRIMARY_REF_NONE;
   } else {
@@ -2451,7 +2437,6 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     for (i = 0; i < GST_AV1_REFS_PER_FRAME; i++) {
       if (!frame_header->frame_refs_short_signaling)
         frame_header->ref_frame_idx[i] = gst_av1_read_bits (br, 3);
-
       if (seq_header->frame_id_numbers_present_flag) {
         frame_header->delta_frame_id_minus_1 =
             gst_av1_read_bits (br,
@@ -2510,7 +2495,6 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     frame_header->disable_frame_end_update_cdf = 1;
   else
     frame_header->disable_frame_end_update_cdf = gst_av1_read_bit (br);
-
   /*SPECs sets upt CDFs here - for codecparser we are ommitting this section. */
   /* SKIP
      if ( primary_ref_frame == PRIMARY_REF_NONE ) {
@@ -2522,31 +2506,22 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
    */
   retval = gst_av1_parse_tile_info (parser, br, &(frame_header->tile_info));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   retval =
       gst_av1_parse_quantization_params (parser, br,
       &(frame_header->quantization_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   retval =
       gst_av1_parse_segmentation_params (parser, br,
       &(frame_header->segmentation_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   retval =
       gst_av1_parse_quantizer_index_delta_params (parser, br,
       &(frame_header->quantization_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   retval =
       gst_av1_parse_loop_filter_delta_params (parser, br,
       &(frame_header->loop_filter_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
 /*
   if ( primary_ref_frame == PRIMARY_REF_NONE ) {
     init_coeff_cdfs( )
@@ -2561,7 +2536,6 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     gint qindex =
         gst_av1_get_qindex_ignoreDeltaQ (&(frame_header->quantization_params),
         segment_id);
-
     frame_header->lossless_array[segment_id] = (qindex == 0)
         && (frame_header->quantization_params.delta_q_ydc == 0)
         && (frame_header->quantization_params.delta_q_uac == 0)
@@ -2587,27 +2561,18 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
   }
   frame_header->all_lossless = frame_header->coded_lossless
       && (frame_header->frame_width == frame_header->upscaled_width);
-
   retval =
       gst_av1_parse_loop_filter_params (parser, br,
       &(frame_header->loop_filter_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   retval = gst_av1_parse_cdef_params (parser, br, &(frame_header->cdef_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   retval =
       gst_av1_parse_loop_restoration_params (parser, br,
       &(frame_header->loop_restoration_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   retval = gst_av1_parse_tx_mode (parser, br, frame_header);
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   /*inlined frame_reference_mode() */
   if (frame_header->frame_is_intra) {
     frame_header->reference_select = 0;
@@ -2617,29 +2582,21 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
 
   retval = gst_av1_parse_skip_mode_params (parser, br, frame_header);
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   if (frame_header->frame_is_intra ||
       frame_header->error_resilient_mode || !seq_header->enable_warped_motion)
     frame_header->allow_warped_motion = 0;
   else
     frame_header->allow_warped_motion = gst_av1_read_bit (br);
-
   frame_header->reduced_tx_set = gst_av1_read_bit (br);
-
   retval =
       gst_av1_parse_global_motion_params (parser, br,
       &(frame_header->global_motion_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
-
   retval =
       gst_av1_parse_film_grain_params (parser, br,
       &(frame_header->film_grain_params));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   return GST_AV1_PARSER_OK;
-
 }
 
 static GstAV1ParserResult
@@ -2648,22 +2605,18 @@ gst_av1_load_reference_frame (GstAV1Parser * parser)
   /* Note: gst_av1_reference_frame_update() is only partialy implemented
    * Check: AV1 Bitstream Spec Chapter 7.20
    */
+  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1ReferenceFrameInfo *ref_info;
-
   GST_AV1_DEBUG ();
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   ref_info = &(parser->ref_info);
-
   if (frame_header->frame_to_show_map_idx > GST_AV1_NUM_REF_FRAMES - 1)
     return GST_AV1_PARSER_ERROR;
-
   frame_header->current_frame_id =
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_frame_id;
   frame_header->frame_type =
@@ -2684,13 +2637,12 @@ gst_av1_load_reference_frame (GstAV1Parser * parser)
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_mi_cols;
   frame_header->mi_rows =
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_mi_rows;
-  parser->subsampling_x =
+  priv->subsampling_x =
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_subsampling_x;
-  parser->subsampling_y =
+  priv->subsampling_y =
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_subsampling_y;
-  parser->bit_depth =
+  priv->bit_depth =
       ref_info->entry[frame_header->frame_to_show_map_idx].ref_bit_depth;
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -2700,27 +2652,20 @@ gst_av1_reference_frame_update (GstAV1Parser * parser)
   /* Note: gst_av1_reference_frame_update() is only partialy implemented
    * Check: AV1 Bitstream Spec Chapter 7.20
    */
-
-
+  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
   GstAV1FrameHeaderOBU *frame_header;
   GstAV1ReferenceFrameInfo *ref_info;
   gint i;
-
   GST_AV1_DEBUG ();
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   ref_info = &(parser->ref_info);
-
-
   if (frame_header->frame_type == GST_AV1_INTRA_ONLY_FRAME
       && frame_header->refresh_frame_flags == 0xff)
     return GST_AV1_PARSER_BITSTREAM_ERROR;
-
   for (i = 0; i < GST_AV1_NUM_REF_FRAMES - 1; i++) {
     if ((frame_header->refresh_frame_flags >> i) & 1) {
       ref_info->entry[i].ref_valid = 1;
@@ -2734,9 +2679,9 @@ gst_av1_reference_frame_update (GstAV1Parser * parser)
       ref_info->entry[i].ref_order_hint = frame_header->order_hint;
       ref_info->entry[i].ref_mi_cols = frame_header->mi_cols;
       ref_info->entry[i].ref_mi_rows = frame_header->mi_rows;
-      ref_info->entry[i].ref_subsampling_x = parser->subsampling_x;
-      ref_info->entry[i].ref_subsampling_y = parser->subsampling_y;
-      ref_info->entry[i].ref_bit_depth = parser->bit_depth;
+      ref_info->entry[i].ref_subsampling_x = priv->subsampling_x;
+      ref_info->entry[i].ref_subsampling_y = priv->subsampling_y;
+      ref_info->entry[i].ref_bit_depth = priv->bit_depth;
     }
   }
 
@@ -2748,13 +2693,11 @@ gst_av1_decode_frame_wrapup (GstAV1Parser * parser)
 {
   GstAV1ParserResult retval;
   GstAV1FrameHeaderOBU *frame_header;
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   /*if(frame_header->show_existing_frame = 0 ) {
      decoder would perform post processing filtering see section 7.4. Decode frame wrapup Process
      if(frame_header->segmentation_params.segmentation_enabled && !frame_header->segmentation_params.segmentation_enabled) {
@@ -2771,7 +2714,6 @@ gst_av1_decode_frame_wrapup (GstAV1Parser * parser)
 
   retval = gst_av1_reference_frame_update (parser);
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -2783,12 +2725,9 @@ gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstAV1OBU * obu,
   GstBitReader br;
   const guint8 *coded_tile_data_ptr;
   gint tile, ftile;
-
   GST_AV1_DEBUG ();
-
   memset (tile_list, 0, sizeof (GstAV1TileListOBU));
   gst_bit_reader_init (&br, obu->data, obu->size);
-
   tile_list->output_frame_width_in_tiles_minus_1 = gst_av1_read_bits (&br, 8);
   tile_list->output_frame_height_in_tiles_minus_1 = gst_av1_read_bits (&br, 8);
   tile_list->tile_count_minus_1 = gst_av1_read_bits (&br, 16);
@@ -2808,10 +2747,8 @@ gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstAV1OBU * obu,
       return GST_AV1_ALLOCATION_ERROR;
     }
     coded_tile_data_ptr = obu->data + gst_bit_reader_get_pos (&br) / 8;
-
     memcpy (tile_list->entry[tile].coded_tile_data, coded_tile_data_ptr,
         tile_list->entry[tile].tile_data_size_minus_1 + 1);
-
     gst_av1_bit_reader_skip_bytes (&br,
         tile_list->entry[tile].tile_data_size_minus_1 + 1);
   }
@@ -2825,13 +2762,10 @@ GstAV1ParserResult
 gst_av1_free_coded_tile_data_from_tile_list_obu (GstAV1TileListOBU * tile_list)
 {
   gint tile;
-
   GST_AV1_DEBUG ();
-
   for (tile = 0; tile <= tile_list->tile_count_minus_1; tile++)
     g_slice_free1 (tile_list->entry[tile].tile_data_size_minus_1 + 1,
         tile_list->entry[tile].coded_tile_data);
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -2845,25 +2779,19 @@ gst_av1_parse_tile_group_obu_with_offset (GstAV1Parser * parser,
   GstAV1FrameHeaderOBU *frame_header;
   gint tile_num, end_bit_pos, header_bytes, start_bit_pos;
   gsize sz;
-
   GST_AV1_DEBUG ();
-
   if (!parser->frame_header) {
     GST_LOG ("Missing OBU Reference: frame_header");
     return GST_AV1_PARSER_MISSING_OBU_REFERENCE;
   }
   frame_header = parser->frame_header;
-
   memset (tile_group, 0, sizeof (GstAV1TileGroupOBU));
   gst_bit_reader_init (&br, obu->data + obu_offset, obu->size);
   sz = obu->size - obu_offset;
-
-
   tile_group->num_tiles =
       frame_header->tile_info.tile_cols * frame_header->tile_info.tile_rows;
   start_bit_pos = gst_av1_bit_reader_get_pos (&br);
   tile_group->tile_start_and_end_present_flag = 0;
-
   if (tile_group->num_tiles > 1)
     tile_group->tile_start_and_end_present_flag = gst_av1_read_bit (&br);
   if (tile_group->num_tiles == 1
@@ -2879,11 +2807,9 @@ gst_av1_parse_tile_group_obu_with_offset (GstAV1Parser * parser,
   }
 
   gst_av1_bit_reader_skip_to_byte (&br);
-
   end_bit_pos = gst_av1_bit_reader_get_pos (&br);
   header_bytes = (end_bit_pos - start_bit_pos) / 8;
   sz -= header_bytes;
-
   for (tile_num = tile_group->tg_start; tile_num <= tile_group->tg_end;
       tile_num++) {
     tile_group->entry[tile_num].tile_row =
@@ -2894,9 +2820,8 @@ gst_av1_parse_tile_group_obu_with_offset (GstAV1Parser * parser,
     if (tile_num == tile_group->tg_end) {
       tile_group->entry[tile_num].tile_size = sz;
     } else {
-      gint tile_size_minus_1 =
-          gst_av1_bitstreamfn_le (&br, frame_header->tile_info.tile_size_bytes,
-          &retval);
+      gint tile_size_minus_1 = gst_av1_bitstreamfn_le (&br,
+          frame_header->tile_info.tile_size_bytes, &retval);
       GST_AV1_EVAL_RETVAL_LOGGED (retval);
       tile_group->entry[tile_num].tile_size = tile_size_minus_1 + 1;
       sz -=
@@ -2936,7 +2861,6 @@ gst_av1_parse_tile_group_obu_with_offset (GstAV1Parser * parser,
      */
     retval = gst_av1_decode_frame_wrapup (parser);
     GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
     priv->seen_frame_header = 0;
   }
 
@@ -2957,11 +2881,8 @@ gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
   GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
   GstBitReader br;
   GstAV1ParserResult retval;
-
   GST_AV1_DEBUG ();
-
   gst_bit_reader_init (&br, obu->data, obu->size);
-
   if (priv->seen_frame_header == 1) {
     /*frame_header holds vaild data */
     return GST_AV1_PARSER_OK;
@@ -2969,14 +2890,11 @@ gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
     retval =
         gst_av1_parse_uncompressed_frame_header (parser, &br, frame_header);
     GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
     priv->seen_frame_header = 1;
-
     if (frame_header->show_existing_frame) {
       /*decode_frame_warpup(); */
       retval = gst_av1_decode_frame_wrapup (parser);
       GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
       priv->seen_frame_header = 0;
     } else {
       /*tile_num = 0; */
@@ -2986,7 +2904,6 @@ gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
 
   gst_av1_bit_reader_skip_to_byte (&br);
   priv->frame_header_size = gst_av1_bit_reader_get_pos (&br) / 8;
-
   /*return gst_av1_skip_trailing_bits (parser, br); */
   return GST_AV1_PARSER_OK;
 }
@@ -2997,17 +2914,13 @@ gst_av1_parse_frame_obu (GstAV1Parser * parser, GstAV1OBU * obu,
 {
   GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
   GstAV1ParserResult retval;
-
   GST_AV1_DEBUG ();
-
   retval = gst_av1_parse_frame_header_obu (parser, obu, &(frame->frame_header));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   retval =
       gst_av1_parse_tile_group_obu_with_offset (parser, obu,
       obu->size - priv->frame_header_size, &(frame->tile_group));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -3015,18 +2928,13 @@ GstAV1Parser *
 gst_av1_parser_new (gboolean use_annexb)
 {
   GstAV1Parser *parser;
-
   GST_DEBUG ("Create AV1 Parser");
-
   parser = g_slice_new0 (GstAV1Parser);
   if (!parser)
     return NULL;
-
   /* not necessary because of g_slice_new0 (instead of g_slice_new) */
   /* memset (parser, 0, sizeof (GstAV1Parser)); */
-
   parser->priv = g_slice_new0 (GstAV1ParserPrivate);
-
   if (!parser->priv) {
     g_slice_free (GstAV1Parser, parser);
     return NULL;
@@ -3036,7 +2944,6 @@ gst_av1_parser_new (gboolean use_annexb)
   /* memset (parser->priv, 0, sizeof (GstAV1ParserPrivate)); */
 
   parser->use_annexb = use_annexb;
-
   return parser;
 }
 
