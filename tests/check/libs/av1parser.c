@@ -22,6 +22,7 @@
 #include <gst/base/gstbitreader.h>
 #include <gst/codecparsers/gstav1parser.h>
 
+/* testdata taken from aom testdata */
 static const guint8 aom_testdata_av1_1_b8_01_size_16x16[] = {
   0x12, 0x00, 0x0a, 0x0a, 0x00, 0x00, 0x00, 0x01, 0x9f, 0xfb, 0xff, 0xf3,
   0x00, 0x80, 0x32, 0xa6, 0x01, 0x10, 0x00, 0x87, 0x80, 0x00, 0x03, 0x00,
@@ -47,6 +48,7 @@ static const guint8 aom_testdata_av1_1_b8_01_size_16x16[] = {
   0xf8, 0xfc, 0xc9, 0x7d, 0x9d, 0x4a, 0x61, 0x16, 0xb1, 0x65
 };
 
+/* testdata taken from aom testdata deecoded and reencoded with annexb */
 static const guint8 aom_testdata_av1_1_b8_01_size_16x16_reencoded_annexb[] = {
   0x8b, 0x02, 0x89, 0x02, 0x01, 0x10, 0x0b, 0x08, 0x00, 0x00, 0x00, 0x01,
   0x9f, 0xfb, 0xff, 0xf3, 0x00, 0x80, 0xf9, 0x01, 0x30, 0x10, 0x01, 0x80,
@@ -94,6 +96,15 @@ static const guint8 aom_testdata_av1_1_b8_01_size_16x16_reencoded_annexb[] = {
   0x82, 0x67, 0xb6, 0x8a, 0xdc, 0xe0
 };
 
+/* hand crafted test case for metadata */
+static const guint8 metadata_obu[] = {
+  0x2a, 0x05, 0x01, 0x12, 0x34, 0x56, 0x78
+};
+
+/* hand crafted test case for tile list */
+static const guint8 tile_list_obu[] = {
+  0x42, 0x0a, 0x01, 0x01, 0x00, 0x01, 0x11, 0x22, 0x33, 0x00, 0x01, 0xa5
+};
 
 GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
 {
@@ -105,9 +116,9 @@ GST_START_TEST (test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16)
   const guint8 *data;
 
 
-  bzero (&obu, sizeof (obu));
-  bzero (&seq_header, sizeof (seq_header));
-  bzero (&frame, sizeof (frame));
+  memset (&obu, 0, sizeof (obu));
+  memset (&seq_header, 0, sizeof (seq_header));
+  memset (&frame, 0, sizeof (frame));
 
   parser = gst_av1_parser_new (FALSE);
 
@@ -366,9 +377,9 @@ GST_START_TEST
   const guint8 *data;
 
 
-  bzero (&obu, sizeof (obu));
-  bzero (&seq_header, sizeof (seq_header));
-  bzero (&frame, sizeof (frame));
+  memset (&obu, 0, sizeof (obu));
+  memset (&seq_header, 0, sizeof (seq_header));
+  memset (&frame, 0, sizeof (frame));
 
   parser = gst_av1_parser_new (TRUE);
 
@@ -415,6 +426,11 @@ GST_START_TEST
   assert_equals_int (frame.frame_header.show_frame, 1);
   assert_equals_int (frame.frame_header.quantization_params.base_q_idx, 0);
 
+  assert_equals_int (frame.tile_group.num_tiles, 1);
+  assert_equals_int (frame.tile_group.entry[0].tile_row, 0);
+  assert_equals_int (frame.tile_group.entry[0].tile_col, 0);
+
+
 
   /* 4th OBU should be OBU_TEMPORAL_DELIMITER */
   gst_av1_parse_get_next_obu (parser, &obu);
@@ -442,11 +458,92 @@ GST_START_TEST
   assert_equals_int (frame.frame_header.show_frame, 1);
   assert_equals_int (frame.frame_header.quantization_params.base_q_idx, 0);
 
+  assert_equals_int (frame.tile_group.num_tiles, 1);
+  assert_equals_int (frame.tile_group.entry[0].tile_row, 0);
+  assert_equals_int (frame.tile_group.entry[0].tile_col, 0);
+
   gst_av1_parser_free (parser);
 
 }
 
 GST_END_TEST;
+
+GST_START_TEST (test_metadata_obu)
+{
+  GstAV1Parser *parser;
+  GstAV1OBU obu;
+  GstAV1MetadataOBU metadata;
+  gsize size;
+  const guint8 *data;
+
+  memset (&obu, 0, sizeof (obu));
+  memset (&metadata, 0, sizeof (metadata));
+
+  parser = gst_av1_parser_new (FALSE);
+
+  data = metadata_obu;
+  size = sizeof (metadata_obu);
+
+  gst_av1_parse_get_first_obu (parser, data, 0, size, &obu);
+  assert_equals_int (obu.header.obu_type, GST_AV1_OBU_METADATA);
+  assert_equals_int (obu.header.obu_extention_flag, 0);
+  assert_equals_int (obu.header.obu_has_size_field, 1);
+  assert_equals_int (obu.header.obu_size, 5);
+
+  gst_av1_parse_metadata_obu (parser, &obu, &metadata);
+
+  assert_equals_int (metadata.metadata_type, GST_AV1_METADATA_TYPE_HDR_CLL);
+  assert_equals_int (metadata.hdr_cll.max_cll, 0x1234);
+  assert_equals_int (metadata.hdr_cll.max_fall, 0x5678);
+
+  gst_av1_parser_free (parser);
+
+}
+
+GST_END_TEST;
+
+GST_START_TEST (test_tile_list_obu)
+{
+  GstAV1Parser *parser;
+  GstAV1OBU obu;
+  GstAV1TileListOBU tile_list;
+  gsize size;
+  const guint8 *data;
+
+  memset (&obu, 0, sizeof (obu));
+  memset (&tile_list, 0, sizeof (tile_list));
+
+  parser = gst_av1_parser_new (FALSE);
+
+  data = tile_list_obu;
+  size = sizeof (tile_list_obu);
+
+  gst_av1_parse_get_first_obu (parser, data, 0, size, &obu);
+  assert_equals_int (obu.header.obu_type, GST_AV1_OBU_TILE_LIST);
+  assert_equals_int (obu.header.obu_extention_flag, 0);
+  assert_equals_int (obu.header.obu_has_size_field, 1);
+  assert_equals_int (obu.header.obu_size, 10);
+
+  gst_av1_parse_tile_list_obu (parser, &obu, &tile_list);
+
+  assert_equals_int (tile_list.output_frame_width_in_tiles_minus_1, 1);
+  assert_equals_int (tile_list.output_frame_height_in_tiles_minus_1, 1);
+  assert_equals_int (tile_list.tile_count_minus_1, 1);
+
+  assert_equals_int (tile_list.entry[0].anchor_frame_idx, 0x11);
+  assert_equals_int (tile_list.entry[0].anchor_tile_row, 0x22);
+  assert_equals_int (tile_list.entry[0].anchor_tile_col, 0x33);
+  assert_equals_int (tile_list.entry[0].tile_data_size_minus_1, 0x01);
+  assert_equals_int (tile_list.entry[0].coded_tile_data[0], 0xa5);
+
+  gst_av1_free_coded_tile_data_from_tile_list_obu (&tile_list);
+
+  gst_av1_parser_free (parser);
+
+}
+
+GST_END_TEST;
+
 
 static Suite *
 av1parsers_suite (void)
@@ -459,6 +556,8 @@ av1parsers_suite (void)
   tcase_add_test (tc_chain, test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16);
   tcase_add_test (tc_chain,
       test_av1_parse_aom_testdata_av1_1_b8_01_size_16x16_reencoded_annexb);
+  tcase_add_test (tc_chain, test_metadata_obu);
+  tcase_add_test (tc_chain, test_tile_list_obu);
 
   return s;
 }

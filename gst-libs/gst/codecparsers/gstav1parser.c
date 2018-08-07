@@ -27,8 +27,6 @@
  * [specification](https://aomediacodec.github.io/av1-spec/av1-spec.pdf)
  */
 
- /* TODO: Annex B */
-
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -38,7 +36,6 @@
 #include <glib.h>
 #include "gstav1parser.h"
 
-#include <stdio.h>
 #define GST_AV1_DEBUG() while(0) { GST_DEBUG("enter"); }
 #define GST_AV1_EVAL_RETVAL_LOGGED(ret) if (ret != GST_AV1_PARSER_OK) { GST_LOG("Parser-Error(%d) at line %d",(gint)ret, __LINE__); return ret; }
 
@@ -60,14 +57,7 @@ typedef struct
   guint8 temporal_id;
   guint8 spatial_id;
 
-  /*guint32 parser_frame_id; might be needed for frame unit accounting with annex b */
   gsize frame_header_size;
-
-  /*guint64 obu_start_position;
-     gsize obu_size;
-     GstAV1OBUType obu_type;
-   */
-
 
   struct
   {
@@ -88,6 +78,12 @@ typedef struct
     gsize temporal_unit_bytes_left;
     gsize frame_unit_bytes_left;
   } annexb;
+
+  /*guint32 parser_frame_id; might be needed for frame unit accounting with annex b */
+  /*guint64 obu_start_position;
+     gsize obu_size;
+     GstAV1OBUType obu_type;
+   */
 
 } GstAV1ParserPrivate;
 
@@ -408,7 +404,7 @@ gst_av1_parse_annexb_temporal_and_frame_unit_size (GstAV1Parser * parser,
   gst_bit_reader_init (&br, data + offset, size);
 
   parser->annexb.temporal_unit_size = gst_av1_bitstreamfn_leb128 (&br, &retval);
-  printf ("tempunit: %ld\n", parser->annexb.temporal_unit_size);
+  /* printf ("tempunit: %ld\n", parser->annexb.temporal_unit_size); */
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
 
   parser->annexb.frame_unit_size = gst_av1_bitstreamfn_leb128 (&br, &retval);
@@ -602,11 +598,11 @@ gst_av1_parse_get_next_obu (GstAV1Parser * parser, GstAV1OBU * obu)
       priv->current_chunk.offset + priv->current_obu.offset +
       current_obu_total_size;
 
-  printf ("bytes left tu: %ld fu: %ld\n", priv->annexb.temporal_unit_bytes_left,
-      priv->annexb.frame_unit_bytes_left);
+  /* printf ("bytes left tu: %ld fu: %ld\n", priv->annexb.temporal_unit_bytes_left,
+     priv->annexb.frame_unit_bytes_left); */
 
-  printf ("offset: %ld current_obu.header_size: %ld current_obu.size: %ld  \n",
-      offset, priv->current_obu.header_size, priv->current_obu.size);
+  /* printf ("offset: %ld current_obu.header_size: %ld current_obu.size: %ld  \n",
+     offset, priv->current_obu.header_size, priv->current_obu.size); */
 
   if (parser->use_annexb) {
     if (priv->annexb.temporal_unit_bytes_left < current_obu_total_size)
@@ -844,10 +840,11 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
       }
 
       if (seq_header->initial_display_delay_present_flag) {
-        seq_header->operating_points[i].
-            initial_display_delay_present_for_this_op = gst_av1_read_bit (&br);
-        if (seq_header->operating_points[i].
-            initial_display_delay_present_for_this_op)
+        seq_header->
+            operating_points[i].initial_display_delay_present_for_this_op =
+            gst_av1_read_bit (&br);
+        if (seq_header->
+            operating_points[i].initial_display_delay_present_for_this_op)
           seq_header->operating_points[i].initial_display_delay_minus_1 =
               gst_av1_read_bits (&br, 4);
       }
@@ -2271,8 +2268,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
         /*inline temporal_point_info */
         frame_header->frame_presentation_time =
             gst_av1_read_bits (br,
-            seq_header->decoder_model_info.
-            frame_presentation_time_length_minus_1 + 1);
+            seq_header->
+            decoder_model_info.frame_presentation_time_length_minus_1 + 1);
       frame_header->refresh_frame_flags = 0;
       if (seq_header->frame_id_numbers_present_flag) {
         frame_header->display_frame_id = gst_av1_read_bits (br, id_len);
@@ -2300,8 +2297,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
       /*inline temporal_point_info */
       frame_header->frame_presentation_time =
           gst_av1_read_bits (br,
-          seq_header->decoder_model_info.
-          frame_presentation_time_length_minus_1 + 1);
+          seq_header->
+          decoder_model_info.frame_presentation_time_length_minus_1 + 1);
     if (frame_header->show_frame)
       frame_header->showable_frame = 0;
     else
@@ -2377,16 +2374,16 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     if (frame_header->buffer_removal_time_present_flag) {
       for (op_num = 0; op_num <= seq_header->operating_points_cnt_minus_1;
           op_num++) {
-        if (seq_header->operating_points[op_num].
-            decoder_model_present_for_this_op) {
+        if (seq_header->
+            operating_points[op_num].decoder_model_present_for_this_op) {
           gint opPtIdc = seq_header->operating_points[op_num].idc;
           gint inTemporalLayer = (opPtIdc >> priv->temporal_id) & 1;
           gint inSpatialLayer = (opPtIdc >> (priv->spatial_id + 8)) & 1;
           if (opPtIdc == 0 || (inTemporalLayer && inSpatialLayer))
             frame_header->buffer_removal_time[op_num] =
                 gst_av1_read_bits (br,
-                seq_header->decoder_model_info.
-                buffer_removal_time_length_minus_1 + 1);
+                seq_header->
+                decoder_model_info.buffer_removal_time_length_minus_1 + 1);
         }
       }
     }
@@ -2831,17 +2828,17 @@ gst_av1_parse_tile_group_obu_with_offset (GstAV1Parser * parser,
     }
 
     tile_group->entry[tile_num].mi_row_start =
-        frame_header->tile_info.mi_row_starts[tile_group->
-        entry[tile_num].tile_row];
+        frame_header->tile_info.mi_row_starts[tile_group->entry[tile_num].
+        tile_row];
     tile_group->entry[tile_num].mi_row_end =
-        frame_header->tile_info.mi_row_starts[tile_group->
-        entry[tile_num].tile_row + 1];
+        frame_header->tile_info.mi_row_starts[tile_group->entry[tile_num].
+        tile_row + 1];
     tile_group->entry[tile_num].mi_col_start =
-        frame_header->tile_info.mi_col_starts[tile_group->
-        entry[tile_num].tile_col];
+        frame_header->tile_info.mi_col_starts[tile_group->entry[tile_num].
+        tile_col];
     tile_group->entry[tile_num].mi_col_end =
-        frame_header->tile_info.mi_col_starts[tile_group->
-        entry[tile_num].tile_col + 1];
+        frame_header->tile_info.mi_col_starts[tile_group->entry[tile_num].
+        tile_col + 1];
     tile_group->entry[tile_num].current_q_index =
         frame_header->quantization_params.base_q_idx;
     /* Skipped
