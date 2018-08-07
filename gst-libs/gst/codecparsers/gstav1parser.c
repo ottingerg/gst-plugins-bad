@@ -22,6 +22,39 @@
  * @title: GstAV1Parser
  * @short_description: Convenience library for parsing AV1 video bitstream.
  *
+ * It offers you bitstream parsing of low overhead bistream format (Section 5) or Annex B
+ * according to the initialization of the parser. Use gst_av1_parser_new(FALSE) for low
+ * overhead bitstream format (Section 5) or gst_av1_parser_new(TRUE) for Annex B.
+ *
+ * To retrieve OBUs and parse its headers, you should call:
+ * gst_av1_parse_get_first_obu() for the first OBU in the provided data chunk.
+ * and gst_av1_parse_get_next_obu() for the remaining OBUs in the data chunk.
+ *
+ * Then, depending on the #GstAV1OBUType of the newly parsed #GstAV1OBU,
+ * you should call the differents functions to parse the structure:
+ *
+ *   * #GST_AV1_OBU_SEQUENCE_HEADER: gst_av1_parse_sequence_header_obu()
+ *
+ *   * #GST_AV1_OBU_TEMPORAL_DELIMITER: gst_av1_parse_temporal_delimiter_obu()
+ *
+ *   * #GST_AV1_OBU_FRAME: gst_av1_parse_frame_obu()
+ *
+ *   * #GST_AV1_OBU_FRAME_HEADER: gst_av1_parse_frame_header_obu()
+ *
+ *   * #GST_AV1_OBU_TILE_GROUP: gst_av1_parse_tile_group_obu()
+ *
+ *   * #GST_AV1_OBU_METADATA: gst_av1_parse_metadata_obu()
+ *
+ *   * #GST_AV1_OBU_REDUNDANT_FRAME_HEADER: gst_av1_parse_frame_header_obu()
+ *
+ *   * #GST_AV1_OBU_TILE_LIST: gst_av1_parse_tile_list_obu()
+ *
+ * Note: Some parser functions are dependent on information provided in the
+ * sequence header and/or frame header - therefore the parser stores references
+ * to the last decoded sequence and frame headers in its parser struct. Make sure
+ * that these structs (#GstAV1SequenceHeaderOBU and #GstAV1FrameHeaderOBU) exist
+ * throughout the whole parsing process.
+ *
  * For more details about the structures, you can refer to the
  * AV1 Bitstream & Decoding Process Specification V1.0.0
  * [specification](https://aomediacodec.github.io/av1-spec/av1-spec.pdf)
@@ -43,7 +76,21 @@
  * GstAV1ParserPrivate:
  *
  * @seen_frame_header: is a variable used to mark whether the frame header for the current frame has been received.
- *                   It is initialized to zero.
+ *                     It is initialized to zero.
+ * @subsampling_x: specifies the chroma subsampling (in x direction) format for the current frame.
+ * @subsampling_y: specifies the chroma subsampling (in y direction) format for the current frame.
+ * @bit_depth: the bit depth of the current frame
+ * @temporal_id: specifies the current temporal id for temporal scaling.
+ * @spatial_id: specifies the current spatial id for spatial scaling.
+ * @frame_header_size: stores the size of the current frame_header (needed for decoding Frame Header and Tile Group in one OBU)
+ * @current_chunk.data: references the current data chunk that is going to be processed
+ * @current_chunk.size: size of the current data chunk
+ * @current_chunk.offset: offset of the current data chunk
+ * @current_obu.offset: offset of the last processed OBU
+ * @current_obu.size: size of the last processed OBU
+ * @current_obu.header_size: Header size of the last processed OBU
+ * @annexb.temporal_unit_bytes_left: Indicates how many bytes are left for consumption in the current temporal unit
+ * @annexb.frame_unit_bytes_left: Indicates how many bytes are left for consumption in the current frame unit
  *
  */
 typedef struct
@@ -80,10 +127,6 @@ typedef struct
   } annexb;
 
   /*guint32 parser_frame_id; might be needed for frame unit accounting with annex b */
-  /*guint64 obu_start_position;
-     gsize obu_size;
-     GstAV1OBUType obu_type;
-   */
 
 } GstAV1ParserPrivate;
 
@@ -333,56 +376,6 @@ gst_av1_bitstreamfn_delta_q (GstBitReader * br, GstAV1ParserResult * retval)
   return 0;
 }
 
-/*
-static GstAV1ParserResult
-gst_av1_bitstreamfn_trailing_bits (GstBitReader * br, gsize nbBits)
-{
-  guint8 trailing_one_bit, trailing_zero_bit;
-
-  trailing_one_bit = gst_av1_read_bit (br);
-  if (trailing_one_bit != 1) {
-    return GST_AV1_PARSER_BITSTREAM_ERROR;
-  }
-
-  nbBits--;
-  while (nbBits > 0) {
-    trailing_zero_bit = gst_av1_read_bit (br);
-    if (trailing_zero_bit != 0) {
-      return GST_AV1_PARSER_BITSTREAM_ERROR;
-    }
-    nbBits--;
-  }
-
-  return GST_AV1_PARSER_OK;
-}
-*/
-/*************************************
- *                                   *
- * Parser Functions                  *
- *                                   *
- *************************************/
-
-/* might be oboslete by now */
-/*
-static GstAV1ParserResult
-gst_av1_skip_trailing_bits (GstAV1Parser * parser, GstBitReader * br)
-{
-  GstAV1ParserPrivate *priv = GST_AV1_PARSER_GET_PRIVATE (parser);
-  guint64 current_position;
-  gsize payload_bits;
-
-  if (priv->obu_size > 0
-      && priv->obu_type != GST_AV1_OBU_TILE_GROUP
-      && priv->obu_type != GST_AV1_OBU_FRAME) {
-    current_position = gst_av1_bit_reader_get_pos (br);
-    payload_bits = current_position - priv->obu_start_position;
-    return gst_av1_bitstreamfn_trailing_bits (br,
-        priv->obu_size * 8 - payload_bits);
-  }
-  return GST_AV1_PARSER_OK;
-}
-*/
-
 static GstAV1ParserResult
 gst_av1_parse_annexb_temporal_and_frame_unit_size (GstAV1Parser * parser,
     const guint8 * data, gsize offset, gsize size, gsize * bytes_consumed)
@@ -494,12 +487,6 @@ gst_av1_parse_obu_header (GstAV1Parser * parser, GstBitReader * br,
     obu_header->obu_size = 0;
   }
 
-  /*
-     priv->obu_size = obu_header->obu_size;
-     priv->obu_start_position = gst_av1_bit_reader_get_pos (br);
-     priv->obu_type = obu_header->obu_type;
-   */
-
   return GST_AV1_PARSER_OK;
 }
 
@@ -558,6 +545,19 @@ gst_av1_parse_get_obu (GstAV1Parser * parser,
   return retval;
 }
 
+/**
+ * gst_av1_parse_get_first_obu:
+ * @parser: a #GstAV1Parser
+ * @data: The data to parse
+ * @offset: the offset from which to parse @data
+ * @size: the size of @data
+ * @obu: The #GstAV1OBU where to store parsed obu headers
+ *
+ * Parses @data and fills @obu from the first obu data from @data.
+ * Stores references for the data chunk that is currently processed in private parser data.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_get_first_obu (GstAV1Parser * parser,
     const guint8 * data, gsize offset, gsize size, GstAV1OBU * obu)
@@ -581,6 +581,18 @@ gst_av1_parse_get_first_obu (GstAV1Parser * parser,
       obu);
 }
 
+/**
+ * gst_av1_parse_get_next_obu:
+ * @parser: a #GstAV1Parser
+ * @obu: The #GstAV1OBU where to store parsed obu headers
+ *
+ * Uses data reference created by gst_av1_parse_get_first_obu and fills @obu.
+ *
+ * Note: gst_av1_parse_get_first_obu needs to be called first - this stores references
+ * for the data chunk that is currently processed in private parser data.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_get_next_obu (GstAV1Parser * parser, GstAV1OBU * obu)
 {
@@ -597,12 +609,6 @@ gst_av1_parse_get_next_obu (GstAV1Parser * parser, GstAV1OBU * obu)
   offset =
       priv->current_chunk.offset + priv->current_obu.offset +
       current_obu_total_size;
-
-  /* printf ("bytes left tu: %ld fu: %ld\n", priv->annexb.temporal_unit_bytes_left,
-     priv->annexb.frame_unit_bytes_left); */
-
-  /* printf ("offset: %ld current_obu.header_size: %ld current_obu.size: %ld  \n",
-     offset, priv->current_obu.header_size, priv->current_obu.size); */
 
   if (parser->use_annexb) {
     if (priv->annexb.temporal_unit_bytes_left < current_obu_total_size)
@@ -774,6 +780,16 @@ gst_av1_parse_operating_parameters_info (GstAV1Parser * parser,
   return GST_AV1_PARSER_OK;
 }
 
+/**
+ * gst_av1_parse_sequence_header_obu:
+ * @parser: a #GstAV1Parser
+ * @obu: The #GstAV1OBU which will be parsed.
+ * @seq_header: The #GstAV1SequenceHeaderOBU which will hold the parsed data
+ *
+ * Parses Data referenced by @obu and fills @seq_header.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
     GstAV1SequenceHeaderOBU * seq_header)
@@ -840,11 +856,10 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
       }
 
       if (seq_header->initial_display_delay_present_flag) {
-        seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op =
-            gst_av1_read_bit (&br);
-        if (seq_header->
-            operating_points[i].initial_display_delay_present_for_this_op)
+        seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op = gst_av1_read_bit (&br);
+        if (seq_header->operating_points[i].
+            initial_display_delay_present_for_this_op)
           seq_header->operating_points[i].initial_display_delay_minus_1 =
               gst_av1_read_bits (&br, 4);
       }
@@ -925,10 +940,19 @@ gst_av1_parse_sequence_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
       gst_av1_parse_color_config (parser, &br, &(seq_header->color_config));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
   seq_header->film_grain_params_present = gst_av1_read_bit (&br);
-  /* return gst_av1_skip_trailing_bits (parser, &br); */
+
   return GST_AV1_PARSER_OK;
 }
 
+/**
+ * gst_av1_parse_temporal_delimiter_obu:
+ * @parser: a #GstAV1Parser
+ * @obu: The #GstAV1OBU which will be parsed.
+ *
+ * Parses Data referenced by @obu and checks for bitstream conformance.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_temporal_delimiter_obu (GstAV1Parser * parser, GstAV1OBU * obu)
 {
@@ -952,8 +976,6 @@ gst_av1_parse_metadata_itut_t35 (GstAV1Parser * parser, GstBitReader * br,
   if (itut_t35->itu_t_t35_country_code) {
     itut_t35->itu_t_t35_country_code_extention_byte = gst_av1_read_bits (br, 8);
   }
-  /*TODO: Is skipping bytes necessary here? */
-  /*ommiting itu_t_t35_payload_bytes */
 
   return GST_AV1_PARSER_OK;
 }
@@ -1070,6 +1092,16 @@ gst_av1_parse_metadata_timecode (GstAV1Parser * parser, GstBitReader * br,
   return GST_AV1_PARSER_OK;
 }
 
+/**
+ * gst_av1_parse_metadata_obu:
+ * @parser: a #GstAV1Parser
+ * @obu: The #GstAV1OBU which will be parsed.
+ * @metadata: The #GstAV1MetadataOBU which will hold the parsed data
+ *
+ * Parses Data referenced by @obu and fills @metadata.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_metadata_obu (GstAV1Parser * parser, GstAV1OBU * obu,
     GstAV1MetadataOBU * metadata)
@@ -1108,7 +1140,7 @@ gst_av1_parse_metadata_obu (GstAV1Parser * parser, GstAV1OBU * obu,
   }
 
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
-  /*return gst_av1_skip_trailing_bits (parser, br); */
+
   return GST_AV1_PARSER_OK;
 }
 
@@ -2268,8 +2300,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
         /*inline temporal_point_info */
         frame_header->frame_presentation_time =
             gst_av1_read_bits (br,
-            seq_header->
-            decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+            seq_header->decoder_model_info.
+            frame_presentation_time_length_minus_1 + 1);
       frame_header->refresh_frame_flags = 0;
       if (seq_header->frame_id_numbers_present_flag) {
         frame_header->display_frame_id = gst_av1_read_bits (br, id_len);
@@ -2297,8 +2329,8 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
       /*inline temporal_point_info */
       frame_header->frame_presentation_time =
           gst_av1_read_bits (br,
-          seq_header->
-          decoder_model_info.frame_presentation_time_length_minus_1 + 1);
+          seq_header->decoder_model_info.
+          frame_presentation_time_length_minus_1 + 1);
     if (frame_header->show_frame)
       frame_header->showable_frame = 0;
     else
@@ -2374,16 +2406,16 @@ gst_av1_parse_uncompressed_frame_header (GstAV1Parser * parser,
     if (frame_header->buffer_removal_time_present_flag) {
       for (op_num = 0; op_num <= seq_header->operating_points_cnt_minus_1;
           op_num++) {
-        if (seq_header->
-            operating_points[op_num].decoder_model_present_for_this_op) {
+        if (seq_header->operating_points[op_num].
+            decoder_model_present_for_this_op) {
           gint opPtIdc = seq_header->operating_points[op_num].idc;
           gint inTemporalLayer = (opPtIdc >> priv->temporal_id) & 1;
           gint inSpatialLayer = (opPtIdc >> (priv->spatial_id + 8)) & 1;
           if (opPtIdc == 0 || (inTemporalLayer && inSpatialLayer))
             frame_header->buffer_removal_time[op_num] =
                 gst_av1_read_bits (br,
-                seq_header->
-                decoder_model_info.buffer_removal_time_length_minus_1 + 1);
+                seq_header->decoder_model_info.
+                buffer_removal_time_length_minus_1 + 1);
         }
       }
     }
@@ -2715,7 +2747,19 @@ gst_av1_decode_frame_wrapup (GstAV1Parser * parser)
   return GST_AV1_PARSER_OK;
 }
 
-
+/**
+ * gst_av1_parse_tile_list_obu:
+ * @parser: a #GstAV1Parser
+ * @obu: The #GstAV1OBU which will be parsed.
+ * @tile_list: The #GstAV1TileListOBU which will hold the parsed data
+ *
+ * Parses Data referenced by @obu and fills @tile_list.
+ *
+ * Note: This function allocates memory for coded_tile_data, thus it is required that
+ * gst_av1_free_coded_tile_data_from_tile_list_obu() is called.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstAV1OBU * obu,
     GstAV1TileListOBU * tile_list)
@@ -2751,11 +2795,19 @@ gst_av1_parse_tile_list_obu (GstAV1Parser * parser, GstAV1OBU * obu,
         tile_list->entry[tile].tile_data_size_minus_1 + 1);
   }
 
-  /*return gst_av1_skip_trailing_bits (parser, br); */
   return GST_AV1_PARSER_OK;
 }
 
 
+/**
+ * gst_av1_free_coded_tile_data_from_tile_list_obu:
+ * @tile_list: The #GstAV1TileListOBU which will hold the parsed data
+ *
+ * Frees memory allocated for coded_tile_data.
+ *
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_free_coded_tile_data_from_tile_list_obu (GstAV1TileListOBU * tile_list)
 {
@@ -2828,17 +2880,17 @@ gst_av1_parse_tile_group_obu_with_offset (GstAV1Parser * parser,
     }
 
     tile_group->entry[tile_num].mi_row_start =
-        frame_header->tile_info.mi_row_starts[tile_group->entry[tile_num].
-        tile_row];
+        frame_header->tile_info.mi_row_starts[tile_group->
+        entry[tile_num].tile_row];
     tile_group->entry[tile_num].mi_row_end =
-        frame_header->tile_info.mi_row_starts[tile_group->entry[tile_num].
-        tile_row + 1];
+        frame_header->tile_info.mi_row_starts[tile_group->
+        entry[tile_num].tile_row + 1];
     tile_group->entry[tile_num].mi_col_start =
-        frame_header->tile_info.mi_col_starts[tile_group->entry[tile_num].
-        tile_col];
+        frame_header->tile_info.mi_col_starts[tile_group->
+        entry[tile_num].tile_col];
     tile_group->entry[tile_num].mi_col_end =
-        frame_header->tile_info.mi_col_starts[tile_group->entry[tile_num].
-        tile_col + 1];
+        frame_header->tile_info.mi_col_starts[tile_group->
+        entry[tile_num].tile_col + 1];
     tile_group->entry[tile_num].current_q_index =
         frame_header->quantization_params.base_q_idx;
     /* Skipped
@@ -2865,6 +2917,16 @@ gst_av1_parse_tile_group_obu_with_offset (GstAV1Parser * parser,
   return GST_AV1_PARSER_OK;
 }
 
+/**
+ * gst_av1_parse_tile_group_obu:
+ * @parser: a #GstAV1Parser
+ * @obu: The #GstAV1OBU which will be parsed.
+ * @tile_group: The #GstAV1TileGroupOBU which will hold the parsed data
+ *
+ * Parses Data referenced by @obu and fills @tile_group.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstAV1OBU * obu,
     GstAV1TileGroupOBU * tile_group)
@@ -2872,6 +2934,16 @@ gst_av1_parse_tile_group_obu (GstAV1Parser * parser, GstAV1OBU * obu,
   return gst_av1_parse_tile_group_obu_with_offset (parser, obu, 0, tile_group);
 }
 
+/**
+ * gst_av1_parse_frame_header_obu:
+ * @parser: a #GstAV1Parser
+ * @obu: The #GstAV1OBU which will be parsed.
+ * @frame_header: The #GstAV1FrameHeaderOBU which will hold the parsed data
+ *
+ * Parses Data referenced by @obu and fills @frame_header.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
     GstAV1FrameHeaderOBU * frame_header)
@@ -2902,10 +2974,23 @@ gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstAV1OBU * obu,
 
   gst_av1_bit_reader_skip_to_byte (&br);
   priv->frame_header_size = gst_av1_bit_reader_get_pos (&br) / 8;
-  /*return gst_av1_skip_trailing_bits (parser, br); */
+
   return GST_AV1_PARSER_OK;
 }
 
+/**
+ * gst_av1_parse_frame_obu:
+ * @parser: a #GstAV1Parser
+ * @obu: The #GstAV1OBU which will be parsed.
+ * @frame: The #GstAV1FrameOBU which will hold the parsed data
+ *
+ * Parses Data referenced by @obu and fills @frame.
+ *
+ * Note: gst_av1_parse_frame_obu - is used when both Frame Header and one Tile Group are packed
+ * into one OBU.
+ *
+ * Returns: a #GstAV1ParserResult
+ */
 GstAV1ParserResult
 gst_av1_parse_frame_obu (GstAV1Parser * parser, GstAV1OBU * obu,
     GstAV1FrameOBU * frame)
@@ -2919,9 +3004,18 @@ gst_av1_parse_frame_obu (GstAV1Parser * parser, GstAV1OBU * obu,
       gst_av1_parse_tile_group_obu_with_offset (parser, obu,
       obu->size - priv->frame_header_size, &(frame->tile_group));
   GST_AV1_EVAL_RETVAL_LOGGED (retval);
+
   return GST_AV1_PARSER_OK;
 }
 
+/**
+ * gst_av1_parser_new:
+ * @parser: a #GstAV1Parser
+ *
+ * Generates a new Parser struct.
+ *
+ * Returns: a #GstAV1Parser
+ */
 GstAV1Parser *
 gst_av1_parser_new (gboolean use_annexb)
 {
@@ -2945,6 +3039,12 @@ gst_av1_parser_new (gboolean use_annexb)
   return parser;
 }
 
+/**
+ * gst_av1_parser_free:
+ * @parser: Select FALSE for standard low overhead bitstream format (Section 5) or TRUE for Annex B Mode
+ *
+ * Frees allocated parser data.
+ */
 void
 gst_av1_parser_free (GstAV1Parser * parser)
 {
