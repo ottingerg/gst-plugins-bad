@@ -126,8 +126,6 @@ typedef struct
     gsize frame_unit_bytes_left;
   } annexb;
 
-  /*guint32 parser_frame_id; might be needed for frame unit accounting with annex b */
-
 } GstAV1ParserPrivate;
 
 #define GST_AV1_PARSER_GET_PRIVATE(parser)  ((GstAV1ParserPrivate *)(parser->priv))
