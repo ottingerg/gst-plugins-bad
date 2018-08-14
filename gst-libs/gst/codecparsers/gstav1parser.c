@@ -185,7 +185,7 @@ gst_av1_read_bits_checked (GstBitReader * br, guint nbits,
 
 
 static gint
-gst_av1_helpers_FloorLog2 (guint32 x)
+gst_av1_helpers_floor_log_2 (guint32 x)
 {
   gint s = 0;
 
@@ -197,7 +197,7 @@ gst_av1_helpers_FloorLog2 (guint32 x)
 }
 
 static gint
-gst_av1_helper_TileLog2 (gint blkSize, gint target)
+gst_av1_helper_tile_log_2 (gint blkSize, gint target)
 {
   gint k;
   for (k = 0; (blkSize << k) < target; k++) {
@@ -206,7 +206,7 @@ gst_av1_helper_TileLog2 (gint blkSize, gint target)
 }
 
 static gint
-gst_av1_helper_InverseRecenter (gint r, gint v)
+gst_av1_helper_inverse_recenter (gint r, gint v)
 {
   if (v > 2 * r)
     return v;
@@ -315,7 +315,7 @@ gst_av1_bitstreamfn_ns (GstBitReader * br, guint8 n,
   GST_AV1_DEBUG ();
 
 
-  w = gst_av1_helpers_FloorLog2 (n) + 1;
+  w = gst_av1_helpers_floor_log_2 (n) + 1;
   m = (1 << w) - n;
   v = gst_av1_read_bits_checked (br, w - 1, retval);
   if (*retval != GST_AV1_PARSER_OK)
@@ -1458,13 +1458,13 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
   sb_size = sb_shift + 2;
   max_tile_width_sb = GST_AV1_MAX_TILE_WIDTH >> sb_size;
   max_tile_area_sb = GST_AV1_MAX_TILE_AREA >> (2 * sb_size);
-  min_log2_tile_cols = gst_av1_helper_TileLog2 (max_tile_width_sb, sb_cols);
-  max_log2_tile_cols = gst_av1_helper_TileLog2 (1, MIN (sb_cols,
+  min_log2_tile_cols = gst_av1_helper_tile_log_2 (max_tile_width_sb, sb_cols);
+  max_log2_tile_cols = gst_av1_helper_tile_log_2 (1, MIN (sb_cols,
           GST_AV1_MAX_TILE_COLS));
-  max_log2_tile_rows = gst_av1_helper_TileLog2 (1, MIN (sb_rows,
+  max_log2_tile_rows = gst_av1_helper_tile_log_2 (1, MIN (sb_rows,
           GST_AV1_MAX_TILE_ROWS));
   min_log2_tiles = MAX (min_log2_tile_cols,
-      gst_av1_helper_TileLog2 (max_tile_area_sb, sb_rows * sb_cols));
+      gst_av1_helper_tile_log_2 (max_tile_area_sb, sb_rows * sb_cols));
   uniform_tile_spacing_flag = gst_av1_read_bit (br);
   if (uniform_tile_spacing_flag) {
     tile_info->tile_cols_log2 = min_log2_tile_cols;
@@ -1520,7 +1520,7 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
     tile_info->mi_col_starts[i] = frame_header->mi_cols;
     tile_info->tile_cols = i;
     tile_info->tile_cols_log2 =
-        gst_av1_helper_TileLog2 (1, tile_info->tile_cols);
+        gst_av1_helper_tile_log_2 (1, tile_info->tile_cols);
     if (min_log2_tiles > 0)
       max_tile_area_sb = (sb_rows * sb_cols) >> (min_log2_tiles + 1);
     else
@@ -1539,7 +1539,7 @@ gst_av1_parse_tile_info (GstAV1Parser * parser, GstBitReader * br,
     tile_info->mi_row_starts[i] = frame_header->mi_rows;
     tile_info->tile_rows = i;
     tile_info->tile_rows_log2 =
-        gst_av1_helper_TileLog2 (1, tile_info->tile_rows);
+        gst_av1_helper_tile_log_2 (1, tile_info->tile_rows);
   }
   if (tile_info->tile_cols_log2 > 0 || tile_info->tile_rows_log2 > 0) {
     tile_info->context_update_tile_id =
@@ -1965,9 +1965,9 @@ gst_av1_decode_unsigned_subexp_with_ref (GstBitReader * br, gint mx, gint r,
   GST_AV1_DEBUG ();
   v = gst_av1_decode_subexp (br, mx, retval);
   if ((r << 1) <= mx) {
-    return gst_av1_helper_InverseRecenter (r, v);
+    return gst_av1_helper_inverse_recenter (r, v);
   } else {
-    return mx - 1 - gst_av1_helper_InverseRecenter (mx - 1 - r, v);
+    return mx - 1 - gst_av1_helper_inverse_recenter (mx - 1 - r, v);
   }
 }
 
