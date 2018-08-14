@@ -2,6 +2,7 @@
 
 #include <gst/video/gstvideoaggregator.h>
 #include <gst/codecparsers/gsth264parser.h>
+#include <gst/codecparsers/gstav1parser.h>
 #include <gst/codecparsers/gstmpegvideoparser.h>
 #include <gst/insertbin/gstinsertbin.h>
 #include <gst/mpegts/mpegts.h>

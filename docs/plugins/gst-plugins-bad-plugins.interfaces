@@ -1,6 +1,7 @@
 ADPCMEnc GstPreset
 DvbBaseBin GstChildProxy GstURIHandler
 GstA2dpSink GstChildProxy
+GstAV1Enc GstPreset
 GstAdaptiveDemux GstChildProxy
 GstAmrWbEnc GstPreset
 GstApExSink GstImplementsInterface GstMixer

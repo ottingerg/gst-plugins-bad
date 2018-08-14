@@ -1,0 +1,55 @@
+<plugin>
+  <name>aom</name>
+  <description>AOM plugin library</description>
+  <filename>../../ext/aom/.libs/libgstaom.so</filename>
+  <basename>libgstaom.so</basename>
+  <version>1.15.0.1</version>
+  <license>LGPL</license>
+  <source>gst-plugins-bad</source>
+  <package>GStreamer Bad Plug-ins git</package>
+  <origin>Unknown package origin</origin>
+  <elements>
+    <element>
+      <name>av1dec</name>
+      <longname>AV1 Decoder</longname>
+      <class>Codec/Decoder/Video</class>
+      <description>Decode AV1 video streams</description>
+      <author>Sean DuBois &lt;sean@siobud.com&gt;</author>
+      <pads>
+        <caps>
+          <name>sink</name>
+          <direction>sink</direction>
+          <presence>always</presence>
+          <details>video/x-av1</details>
+        </caps>
+        <caps>
+          <name>src</name>
+          <direction>source</direction>
+          <presence>always</presence>
+          <details>video/x-raw, format=(string)I420, framerate=(fraction)[ 0/1, 2147483647/1 ], width=(int)[ 4, 2147483647 ], height=(int)[ 4, 2147483647 ]</details>
+        </caps>
+      </pads>
+    </element>
+    <element>
+      <name>av1enc</name>
+      <longname>AV1 Encoder</longname>
+      <class>Codec/Encoder/Video</class>
+      <description>Encode AV1 video streams</description>
+      <author>Sean DuBois &lt;sean@siobud.com&gt;</author>
+      <pads>
+        <caps>
+          <name>sink</name>
+          <direction>sink</direction>
+          <presence>always</presence>
+          <details>video/x-raw, format=(string)I420, framerate=(fraction)[ 0/1, 2147483647/1 ], width=(int)[ 4, 2147483647 ], height=(int)[ 4, 2147483647 ]</details>
+        </caps>
+        <caps>
+          <name>src</name>
+          <direction>source</direction>
+          <presence>always</presence>
+          <details>video/x-av1, profile=(string){ 0, 1, 2, 3 }</details>
+        </caps>
+      </pads>
+    </element>
+  </elements>
+</plugin>

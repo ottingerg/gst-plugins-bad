@@ -18,14 +18,15 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
- /*
-  * Description texts for syntax elements are taken from
-  * the AV1 Bitstream & Decoding Process Specification
-  *
-  * For more details about the structures, you can refer to the
-  * AV1 Bitstream & Decoding Process Specification V1.0.0
-  * [specification](https://aomediacodec.github.io/av1-spec/av1-spec.pdf)
-  */
+
+/*
+ * Description texts for syntax elements are taken from
+ * the AV1 Bitstream & Decoding Process Specification
+ *
+ * For more details about the structures, you can refer to the
+ * AV1 Bitstream & Decoding Process Specification V1.0.0
+ * [specification](https://aomediacodec.github.io/av1-spec/av1-spec.pdf)
+ */
 
 #ifndef GST_AV1_PARSER_H
 #define GST_AV1_PARSER_H
@@ -41,7 +42,6 @@
 #include <gst/base/gstbitreader.h>
 
 G_BEGIN_DECLS
-
 
 /* Following defines are taken from the spec */
 #define GST_AV1_REFS_PER_FRAME 7
@@ -70,7 +70,8 @@ G_BEGIN_DECLS
 #define GST_AV1_SUPERRES_DENOM_BITS 3
 #define GST_AV1_PRIMARY_REF_NONE 7
 
-/* Following defines are derived from the spec, but not mentioned by this particular name in the spec */
+/* Following defines are derived from the spec, but not mentioned by
+ * this particular name in the spec */
 #define GST_AV1_CDEF_MAX (1<<3)
 #define GST_AV1_MAX_TILE_COUNT 512
 #define GST_AV1_MAX_OPERATING_POINTS 32
@@ -84,8 +85,6 @@ G_BEGIN_DECLS
 #define GST_AV1_MAX_NUM_CR_POINTS 16
 #define GST_AV1_MAX_NUM_POS_LUMA 25
 #define GST_AV1_MAX_NUM_PLANES 3
-
-
 
 typedef struct _GstAV1Parser GstAV1Parser;
 
@@ -122,7 +121,6 @@ typedef struct _GstAV1ReferenceFrameInfo GstAV1ReferenceFrameInfo;
 
 /**
  * GstAV1ParserResult:
- *
  * @GST_AV1_PARSER_OK: parsing succeeded
  * @GST_AV1_PARSER_ERROR: general parser error
  * @GST_AV1_PARSER_READBITS_ERROR: GstBitReader Error
@@ -143,7 +141,6 @@ typedef enum {
 
 /**
  * GstAV1OBUType:
- *
  * @GST_AV1_OBU_RESERVED_0: Reserved 0
  * @GST_AV1_OBU_SEQUENCE_HEADER: Sequence Header OBU
  * @GST_AV1_OBU_TEMPORAL_DELIMITER: Temporal Delimiter OBU
@@ -183,9 +180,10 @@ typedef enum {
 /**
  * GstAV1MetadataType:
  * @GST_AV1_METADATA_TYPE_RESERVED_0: Reserved 0
- * @GST_AV1_METADATA_TYPE_HDR_CLL: Metadata high dynamic range content light level semantics
- * @GST_AV1_METADATA_TYPE_HDR_MDCV: Metadata high dynamic range mastering display color
- *                                  volume semantics
+ * @GST_AV1_METADATA_TYPE_HDR_CLL: Metadata high dynamic range content
+ * light level semantics
+ * @GST_AV1_METADATA_TYPE_HDR_MDCV: Metadata high dynamic range
+ * mastering display color volume semantics
  * @GST_AV1_METADATA_TYPE_SCALABILITY: Metadata scalability semantics
  * @GST_AV1_METADATA_TYPE_ITUT_T35: Metadata ITUT T35 semantics
  * @GST_AV1_METADATA_TYPE_TIMECODE: Timecode semantics
@@ -267,7 +265,6 @@ typedef enum {
 
 /**
  * GstAV1TransferCharacteristics:
- *
  * GST_AV1_TC_RESERVED_0: For future use
  * @GST_AV1_TC_BT_709: BT.709
  * @GST_AV1_TC_UNSPECIFIED: Unspecified
@@ -350,10 +347,10 @@ typedef enum {
 
 /**
  * GstAV1ChromaSamplePositions:
- * @GST_AV1_CSP_UNKNOWN: Unknown (in this case the source video transfer function must be
- *                      signaled outside the AV1 bitstream).
- * @GST_AV1_CSP_VERTICAL: Horizontally co-located with (0, 0) luma sample, vertical position in
- *                       the middle between two luma samples.
+ * @GST_AV1_CSP_UNKNOWN: Unknown (in this case the source video
+ * transfer function must be signaled outside the AV1 bitstream).
+ * @GST_AV1_CSP_VERTICAL: Horizontally co-located with (0, 0) luma
+ * sample, vertical position in the middle between two luma samples.
  * @GST_AV1_CSP_COLOCATED: co-located with (0, 0) luma sample.
  * @GST_AV1_CSP_RESERVED: For future use.
  */
@@ -396,11 +393,12 @@ typedef enum {
 
 /**
  * GstAV1TXModes:
- * @GST_AV1_TX_MODE_ONLY_4x4: the inverse transform will use only 4x4 transforms.
- * @GST_AV1_TX_MODE_LARGEST: the inverse transform will use the largest transform
- *                           size that fits inside the block.
- * @GST_AV1_TX_MODE_SELECT: the choice of transform size is specified explicitly
- *                          for each block.
+ * @GST_AV1_TX_MODE_ONLY_4x4: the inverse transform will use only 4x4
+ * transforms.
+ * @GST_AV1_TX_MODE_LARGEST: the inverse transform will use the
+ * largest transform size that fits inside the block.
+ * @GST_AV1_TX_MODE_SELECT: the choice of transform size is specified
+ * explicitly for each block.
  */
 typedef enum {
   GST_AV1_TX_MODE_ONLY_4x4 = 0,
@@ -448,7 +446,6 @@ typedef enum {
 
 /**
  * GstAV1WarpModelType:
- *
  * @GST_AV1_WARP_MODEL_IDENTITY: Warp model is just an identity transform
  * @GST_AV1_WARP_MODEL_TRANSLATION: Warp model is a pure translation
  * @GST_AV1_WARP_MODEL_ROTZOOM: Warp model is a rotation + symmetric zoom + translation
@@ -463,10 +460,9 @@ typedef enum {
 
 /**
  * GstAV1OBUHeaderExtention:
- *
  * @obu_temporal_id: specifies the temporal level of the data contained in the OBU.
  * @obu_spatial_id: specifies the spatial level of the data contained in the OBU.
- * @obu_extension_header_reserved_3bits must be set to 0. The value is ignored by a decoder.
+ * @obu_extension_header_reserved_3bits: must be set to 0. The value is ignored by a decoder.
  */
 struct _GstAV1OBUHeaderExtention {
   guint8 obu_temporal_id;
@@ -477,14 +473,14 @@ struct _GstAV1OBUHeaderExtention {
 
 /**
  * GstAV1OBUHeader:
- *
  * @obu_type specifies: the type of data structure contained in the OBU payload.
  * @obu_extention_flag: indicates if OBU header extention is present.
- * @obu_has_size_field: equal to 1 indicates that the obu_size syntax element will be present.
- *                      obu_has_size_field equal to 0 indicates that the obu_size syntax element will not be present.
+ * @obu_has_size_field: equal to 1 indicates that the obu_size syntax
+ * element will be present. #obu_has _size_field equal to 0 indicates
+ * that the #obu_size syntax element will not be present.
  * @obu_reserved_1bit: must be set to 0. The value is ignored by a decoder.
- * @obu_size: contains the size in bytes of the OBU not including the bytes within obu_header
- *            or the obu_size syntax element.
+ * @obu_size: contains the size in bytes of the OBU not including the
+ * bytes within obu_header or the obu_size syntax element.
  * @extention: OBU header extention
  */
 struct _GstAV1OBUHeader {
@@ -512,41 +508,48 @@ struct _GstAV1OBU {
   gsize header_size;
 };
 
-
-
 /**
  * GstAV1OperatingPoint:
- *
- * @seq_level_idx: specifies the level that the coded video sequence conforms to.
- * @seq_tier: specifies the tier that the coded video sequence conforms to.
- * @idc: contains a bitmask that indicates which spatial and temporal layers should be decoded
- *       Bit k is equal to 1 if temporal layer k should be decoded (for k between 0 and 7).
- *       Bit j+8 is equal to 1 if spatial layer j should be decoded (for j between 0 and 3).
- * @decoder_model_present_for_this_op: equal to one indicates that there is a decoder model associated
- *                                     with this operating point.decoder_model_present_for_this_op equal
- *                                     to zero indicates that there is not a decoder model associated.
- * @decoder_buffer_delay: specifies the time interval between the arrival of the first bit in the smoothing
- *                        buffer and the subsequent removal of the data that belongs to the first coded
- *                        frame for operating point op, measured in units of 1/90000 seconds. The length of
- *                        decoder_buffer_delay is specified by buffer_delay_length_minus_1 + 1, in bits.
- * @encoder_buffer_delay: specifies, in combination with decoder_buffer_delay syntax element, the first bit
- *                        arrival time of frames to be decoded to the smoothing buffer. encoder_buffer_delay
- *                        is measured in units of 1/90000 seconds. For a video sequence that includes one or
- *                        more random access points the sum of decoder_buffer_delay and encoder_buffer_delay
- *                        shall be kept constant.
- * @low_delay_mode_flag: equal to 1 indicates that the smoothing buffer operates in low-delay mode for operating
- *                       point op. In low-delay mode late decode times and buffer underflow are both permitted.
- *                       low_delay_mode_flag equal to 0 indicates that the smoothing buffer operates in strict
- *                       mode, where buffer underflow is not allowed.
- * @initial_display_delay_present_for_this_op: equal to 1 indicates that initial_display_delay_minus_1
- *                                             is specified for this operating. 0 indicates that
- *                                             initial_display_delay_minus_1 is not specified for this
- *                                             operating point.
- * @initial_display_delay_minus_1: plus 1 specifies, for operating point i, the number of decoded frames
- *                                that should be present in the buffer pool before the first presentable
- *                                frame is displayed. This will ensure that all presentable frames in the
- *                                sequence can be decoded at or before the time that they are scheduled
- *                                for display.
+ * @seq_level_idx: specifies the level that the coded video sequence
+ * conforms to.
+ * @seq_tier: specifies the tier that the coded video sequence
+ * conforms to.
+ * @idc: contains a bitmask that indicates which spatial and temporal
+ * layers should be decoded. Bit k is equal to 1 if temporal layer k
+ * should be decoded (for k between 0 and 7). Bit j+8 is equal to 1 if
+ * spatial layer j should be decoded (for j between 0 and 3).
+ * @decoder_model_present_for_this_op: equal to one indicates that
+ * there is a decoder model associated with this operating
+ * point. @decoder_model_present_for_this_op[i] equal to zero indicates
+ * that there is not a decoder model associated.
+ * @decoder_buffer_delay: specifies the time interval between the
+ * arrival of the first bit in the smoothing buffer and the subsequent
+ * removal of the data that belongs to the first coded frame for
+ * operating point op, measured in units of 1/90000 seconds. The
+ * length of decoder_buffer_delay is specified by
+ * buffer_delay_length_minus_1 + 1, in bits.
+ * @encoder_buffer_delay: specifies, in combination with
+ * decoder_buffer_delay syntax element, the first bit arrival time of
+ * frames to be decoded to the smoothing buffer. encoder_buffer_delay
+ * is measured in units of 1/90000 seconds. For a video sequence that
+ * includes one or more random access points the sum of
+ * decoder_buffer_delay and encoder_buffer_delay shall be kept
+ * constant.
+ * @low_delay_mode_flag: equal to 1 indicates that the smoothing
+ * buffer operates in low-delay mode for operating point op. In
+ * low-delay mode late decode times and buffer underflow are both
+ * permitted. low_delay_mode_flag[op] equal to 0 indicates that the
+ * smoothing buffer operates in strict mode, where buffer underflow is
+ * not allowed.
+ * @initial_display_delay_present_for_this_op: equal to 1 indicates
+ * that initial_display_delay_minus_1 is specified for this
+ * operating. 0 indicates that initial_display_delay_minus_1 is not
+ * specified for this operating point.
+ * @initial_display_delay_minus_1: plus 1 specifies, for operating
+ * point i, the number of decoded frames that should be present in the
+ * buffer pool before the first presentable frame is displayed. This
+ * will ensure that all presentable frames in the sequence can be
+ * decoded at or before the time that they are scheduled for display.
  */
 struct _GstAV1OperatingPoint {
   guint8 seq_level_idx;
@@ -563,13 +566,16 @@ struct _GstAV1OperatingPoint {
 
 /**
  * GstAV1DecoderModelInfo:
- * @buffer_delay_length_minus_1: plus 1 specifies the length of the decoder_buffer_delay and the encoder_buffer_delay
- *                               syntax elements, in bits.
- * @num_units_in_decoding_tick: is the number of time units of a decoding clock operating at the frequency time_scale
- *                              Hz that corresponds to one increment of a clock tick counter.
- * @buffer_removal_time_length_minus_1: plus 1 specifies the length of the buffer_removal_time syntax element, in bits.
- * @frame_presentation_time_length_minus_1: plus 1 specifies the length of the frame_presentation_time syntax element,
- *                                          in bits.
+ * @buffer_delay_length_minus_1: plus 1 specifies the length of the
+ * decoder_buffer_delay and the encoder_buffer_delay syntax elements,
+ * in bits.
+ * @num_units_in_decoding_tick: is the number of time units of a
+ * decoding clock operating at the frequency time_scale Hz that
+ * corresponds to one increment of a clock tick counter.
+ * @buffer_removal_time_length_minus_1: plus 1 specifies the length of
+ * the buffer_removal_time syntax element, in bits.
+ * @frame_presentation_time_length_minus_1: plus 1 specifies the
+ * length of the frame_presentation_time syntax element, in bits.
  */
 struct _GstAV1DecoderModelInfo {
   guint8 buffer_delay_length_minus_1;
@@ -580,21 +586,37 @@ struct _GstAV1DecoderModelInfo {
 
 /**
  * GstAV1TimingInfo:
- *
- * @num_units_in_display_tick: is the number of time units of a clock operating at the frequency time_scale Hz that
- *                             corresponds to one increment of a clock tick counter. A clock tick, in seconds, is
- *                             equal to num_units_in_display_tick divided by time_scale.
- *                             It is a requirement of bitstream conformance that num_units_in_display_tick is greater than 0.
+ * @num_units_in_display_tick: is the number of time units of a clock
+ *                             operating at the frequency time_scale
+ *                             Hz that corresponds to one increment of
+ *                             a clock tick counter. A clock tick, in
+ *                             seconds, is equal to
+ *                             num_units_in_display_tick divided by
+ *                             time_scale.  It is a requirement of
+ *                             bitstream conformance that
+ *                             num_units_in_display_tick is greater
+ *                             than 0.
  * @time_scale: is the number of time units that pass in one second.
- *              It is a requirement of bitstream conformance that time_scale is greater than 0
- * @equal_picture_interval: equal to 1 indicates that pictures should be displayed according to their output order with the
- *                          number of ticks between two consecutive pictures (without dropping frames) specified by
- *                          num_ticks_per_picture_minus_1 + 1. equal_picture_interval equal to 0 indicates that the interval
- *                          between two consecutive pictures is not specified.
- * @num_ticks_per_picture_minus_1: plus 1 specifies the number of clock ticks corresponding to output time between two
- *                                 consecutive pictures in the output order.
- *                                 It is a requirement of bitstream conformance that the value of num_ticks_per_picture_minus_1
- *                                 shall be in the range of 0 to (1 << 32) − 2, inclusive.
+ *              It is a requirement of bitstream conformance that
+ *              time_scale is greater than 0
+ * @equal_picture_interval: equal to 1 indicates that pictures should
+ *                          be displayed according to their output
+ *                          order with the number of ticks between two
+ *                          consecutive pictures (without dropping
+ *                          frames) specified by
+ *                          num_ticks_per_picture_minus_1 +
+ *                          1. equal_picture_interval equal to 0
+ *                          indicates that the interval between two
+ *                          consecutive pictures is not specified.
+ * @num_ticks_per_picture_minus_1: plus 1 specifies the number of
+ *                                 clock ticks corresponding to output
+ *                                 time between two consecutive
+ *                                 pictures in the output order.  It
+ *                                 is a requirement of bitstream
+ *                                 conformance that the value of
+ *                                 num_ticks_per_picture_minus_1 shall
+ *                                 be in the range of 0 to (1 << 32) −
+ *                                 2, inclusive.
  */
 struct _GstAV1TimingInfo {
   guint32 num_units_in_display_tick;
@@ -605,29 +627,53 @@ struct _GstAV1TimingInfo {
 
 /**
  * GstAV1ColorConfig:
- *
- * @high_bitdepth: is syntax elements which, together with seq_profile and twelve_bit, determines the bit depth.
- * @twelve_bit: is syntax elements which, together with seq_profile and high_bitdepth, determines the bit depth.
- * @mono_chrome: equal to 1 indicates that the video does not contain U and V color planes. mono_chrome equal to 0
- *               indicates that the video contains Y, U, and V color planes.
- * @color_description_present_flag: equal to 1 specifies that color_primaries, transfer_characteristics, and
- *                                  matrix_coefficients are present. color_description_present_flag equal to 0 specifies
- *                                  that color_primaries, transfer_characteristics and matrix_coefficients are not present.
- * @color_primaries: is defined by the “Color primaries” section of ISO/IEC 23091-4/ITU-T H.273.
- * @transfer_characteristics: is an integer that is defined by the “Transfer characteristics” section of ISO/IEC 23091-4
-                              /ITU-T H.273.
- * @matrix_coefficients: is an integer that is defined by the “Matrix coefficients” section of ISO/IEC 23091-4/ITU-T H.273.
- * @color_range: is a binary value that is associated with the VideoFullRangeFlag variable specified in ISO/IEC 23091-4/ITU-T
- *                 H.273. color range equal to 0 shall be referred to as the studio swing representation and color range equal
- *              to 1 shall be referred to as the full swing representation for all intents relating to this specification.
- * @subsampling_x: specify the chroma subsampling format. If matrix_coefficients is equal to GST_AV1_MC_IDENTITY, it is a
- *                 requirement of bitstream that subsampling_x is equal to 0.
- * @subsampling_y: specify the chroma subsampling format. If matrix_coefficients is equal to GST_AV1_MC_IDENTITY, it is a
- *                 requirement of bitstream that subsampling_y is equal to 0.
- * @chroma_sample_position specifies the sample position for subsampled streams:
- * @separate_uv_delta_q: equal to 1 indicates that the U and V planes may have separate delta quantizer values. separate_uv_delta_q
- *                      equal to 0 indicates that the U and V planes will share the same delta quantizer value.
- *
+ * @high_bitdepth: is syntax elements which, together with seq_profile
+ * and twelve_bit, determines the bit depth.
+ * @twelve_bit: is syntax elements which, together with seq_profile
+ * and high_bitdepth, determines the bit depth.
+ * @mono_chrome: equal to 1 indicates that the video does not contain
+ *               U and V color planes. mono_chrome equal to 0
+ *               indicates that the video contains Y, U, and V color
+ *               planes.
+ * @color_description_present_flag: equal to 1 specifies that
+ *                                  color_primaries,
+ *                                  transfer_characteristics, and
+ *                                  matrix_coefficients are
+ *                                  present. color_description_present_flag
+ *                                  equal to 0 specifies that
+ *                                  color_primaries,
+ *                                  transfer_characteristics and
+ *                                  matrix_coefficients are not
+ *                                  present.
+ * @color_primaries: is defined by the “Color primaries” section of
+ * ISO/IEC 23091-4/ITU-T H.273.
+ * @transfer_characteristics: is an integer that is defined by the
+ *                              “Transfer characteristics” section of
+ *                            ISO/IEC 23091-4 /ITU-T H.273.
+ * @matrix_coefficients: is an integer that is defined by the “Matrix
+ * coefficients” section of ISO/IEC 23091-4/ITU-T H.273.
+ * @color_range: is a binary value that is associated with the
+ *                 VideoFullRangeFlag variable specified in ISO/IEC
+ *                 23091-4/ITU-T H.273. color range equal to 0 shall
+ *                 be referred to as the studio swing representation
+ *                 and color range equal to 1 shall be referred to as
+ *                 the full swing representation for all intents
+ *                 relating to this specification.
+ * @subsampling_x: specify the chroma subsampling format. If
+ *                 matrix_coefficients is equal to
+ *                 GST_AV1_MC_IDENTITY, it is a requirement of
+ *                 bitstream that subsampling_x is equal to 0.
+ * @subsampling_y: specify the chroma subsampling format. If
+ *                 matrix_coefficients is equal to
+ *                 GST_AV1_MC_IDENTITY, it is a requirement of
+ *                 bitstream that subsampling_y is equal to 0.
+ * @chroma_sample_position specifies the sample position for
+ * subsampled streams:
+ * @separate_uv_delta_q: equal to 1 indicates that the U and V planes
+ *                      may have separate delta quantizer
+ *                      values. separate_uv_delta_q equal to 0
+ *                      indicates that the U and V planes will share
+ *                      the same delta quantizer value.
  * @bit_depth: bit_depth
  * @num_planes: Number of planes
  */
@@ -650,65 +696,132 @@ struct _GstAV1ColorConfig {
 
 /**
  * GstAV1SequenceHeaderOBU:
- *
- * @seq_profile: specifies the features that can be used in the coded video sequence
- * @still_picture: equal to 1 specifies that the bitstream contains only one coded frame.
- * @reduced_still_picture_header: specifies that the syntax elements not needed by a still picture are omitted
- * @frame_width_bits_minus_1: specifies the number of bits minus 1 used for transmitting the frame width syntax elements.
- * @frame_height_bits_minus_1: specifies the number of bits minus 1 used for transmitting the frame height syntax elements.
- * @max_frame_width_minus_1: specifies the maximum frame width minus 1 for the frames represented by this sequenceheader.
- * @max_frame_height_minus_1: specifies the maximum frame height minus 1 for the frames represented by this sequenceheader.
- * @frame_id_numbers_present_flag: specifies whether frame id numbers are present in the bitstream.
- * @delta_frame_id_length_minus_2: specifies the number of bits minus 2 used to encode delta_frame_id syntax elements.
-.* @additional_frame_id_length_minus_1: is used to calculate the number of bits used to encode the frame_id syntax element.
-.* @use_128x128_superblock: when equal to 1, indicates that superblocks contain 128x128 luma samples. When equal to 0, it
- *                          indicates that superblocks contain 64x64 luma samples. (The number of contained chroma samples
- *                          depends on subsampling_x and subsampling_y).
- * @enable_filter_intra: equal to 1 specifies that the use_filter_intra syntax element may be present.
- *                       enable_filter_intra equal to 0 specifies that the use_filter_intra syntax element will not be present.
- * @enable_intra_edge_filter: specifies whether the intra edge filtering process should be enabled.
- * @enable_interintra_compound: equal to 1 specifies that the mode info for inter blocks may contain the syntax element
- *                              interintra. enable_interintra_compound equal to 0 specifies that the syntax element interintra
- *                              will not be present.
- * @enable_masked_compound: equal to 1 specifies that the mode info for inter blocks may contain the syntax element
- *                          compound_type. enable_masked_compound equal to 0 specifies that the syntax element compound_type
- *                          will not be present.
- * @enable_warped_motion: equal to 1 indicates that the allow_warped_motion syntax element may be present. enable_warped_motion
- *                        equal to 0 indicates that the allow_warped_motion syntax element will not be present.
- * @enable_dual_filter: equal to 1 indicates that the inter prediction filter type may be specified independently in the horizontal
- *                      and vertical directions. If the flag is equal to 0, only one filter type may be specified, which is then
- *                      used in both directions.
- * @enable_jnt_comp: equal to 1 indicates that the distance weights process may be used for inter prediction.
- * @enable_ref_frame_mvs: equal to 1 indicates that the use_ref_frame_mvs syntax element may be present. enable_ref_frame_mvs
- *                        equal to 0 indicates that the use_ref_frame_mvs syntax element will not be present.
- * @enable_superres: equal to 1 specifies that the use_superres syntax element will be present in the uncompressed header.
- *                   enable_superres equal to 0 specifies that the use_superres syntax element will not be present (instead
- *                   use_superres will be set to 0 in the uncompressed header without being read).
- * @enable_cdef: equal to 1 specifies that cdef filtering may be enabled. enable_cdef equal to 0 specifies that cdef filtering is
- *               disabled.
- * @enable_restoration: equal to 1 specifies that loop restoration filtering may be enabled. enable_restoration equal to 0 specifies
- *                      that loop restoration filtering is disabled.
- * @film_grain_params_present: specifies whether film grain parameters are present in the bitstream.
- * @initial_display_delay_present_flag: specifies whether initial display delay information is present in the bitstream or not.
- * @enable_order_hint: equal to 1 indicates that tools based on the values of order hints may be used. enable_order_hint
- *                     equal to 0 indicates that tools based on order hints are disabled.
+ * @seq_profile: specifies the features that can be used in the coded
+ * video sequence
+ * @still_picture: equal to 1 specifies that the bitstream contains
+ * only one coded frame.
+ * @reduced_still_picture_header: specifies that the syntax elements
+ * not needed by a still picture are omitted
+ * @frame_width_bits_minus_1: specifies the number of bits minus 1
+ * used for transmitting the frame width syntax elements.
+ * @frame_height_bits_minus_1: specifies the number of bits minus 1
+ * used for transmitting the frame height syntax elements.
+ * @max_frame_width_minus_1: specifies the maximum frame width minus 1
+ * for the frames represented by this sequenceheader.
+ * @max_frame_height_minus_1: specifies the maximum frame height minus
+ * 1 for the frames represented by this sequenceheader.
+ * @frame_id_numbers_present_flag: specifies whether frame id numbers
+ * are present in the bitstream.
+ * @delta_frame_id_length_minus_2: specifies the number of bits minus
+ * 2 used to encode delta_frame_id syntax elements.
+.* @additional_frame_id_length_minus_1: is used to calculate the
+ * number of bits used to encode the frame_id syntax element.
+ * @use_128x128_superblock: when equal to 1, indicates that
+ *                          superblocks contain 128x128 luma
+ *                          samples. When equal to 0, it indicates
+ *                          that superblocks contain 64x64 luma
+ *                          samples. (The number of contained chroma
+ *                          samples depends on subsampling_x and
+ *                          subsampling_y).
+ * @enable_filter_intra: equal to 1 specifies that the
+ *                       use_filter_intra syntax element may be
+ *                       present.  enable_filter_intra equal to 0
+ *                       specifies that the use_filter_intra syntax
+ *                       element will not be present.
+ * @enable_intra_edge_filter: specifies whether the intra edge
+ * filtering process should be enabled.
+ * @enable_interintra_compound: equal to 1 specifies that the mode
+ *                              info for inter blocks may contain the
+ *                              syntax element
+ *                              interintra. enable_interintra_compound
+ *                              equal to 0 specifies that the syntax
+ *                              element interintra will not be
+ *                              present.
+ * @enable_masked_compound: equal to 1 specifies that the mode info for
+ *                          inter blocks may contain the syntax
+ *                          element
+ *                          compound_type. enable_masked_compound
+ *                          equal to 0 specifies that the syntax
+ *                          element compound_type will not be present.
+ * @enable_warped_motion: equal to 1 indicates that the
+ *                        allow_warped_motion syntax element may be
+ *                        present. enable_warped_motion equal to 0
+ *                        indicates that the allow_warped_motion
+ *                        syntax element will not be present.
+ * @enable_dual_filter: equal to 1 indicates that the inter prediction
+ *                      filter type may be specified independently in
+ *                      the horizontal and vertical directions. If the
+ *                      flag is equal to 0, only one filter type may
+ *                      be specified, which is then used in both
+ *                      directions.
+ * @enable_jnt_comp: equal to 1 indicates that the distance weights
+ * process may be used for inter prediction.
+ * @enable_ref_frame_mvs: equal to 1 indicates that the
+ *                        use_ref_frame_mvs syntax element may be
+ *                        present. enable_ref_frame_mvs equal to 0
+ *                        indicates that the use_ref_frame_mvs syntax
+ *                        element will not be present.
+ * @enable_superres: equal to 1 specifies that the use_superres syntax
+ *                   element will be present in the uncompressed
+ *                   header.  enable_superres equal to 0 specifies
+ *                   that the use_superres syntax element will not be
+ *                   present (instead use_superres will be set to 0 in
+ *                   the uncompressed header without being read).
+ * @enable_cdef: equal to 1 specifies that cdef filtering may be
+ *               enabled. enable_cdef equal to 0 specifies that cdef
+ *               filtering is disabled.
+ * @enable_restoration: equal to 1 specifies that loop restoration
+ *                      filtering may be enabled. enable_restoration
+ *                      equal to 0 specifies that loop restoration
+ *                      filtering is disabled.
+ * @film_grain_params_present: specifies whether film grain parameters
+ * are present in the bitstream.
+ * @initial_display_delay_present_flag: specifies whether initial
+ * display delay information is present in the bitstream or not.
+ * @enable_order_hint: equal to 1 indicates that tools based on the
+ *                     values of order hints may be
+ *                     used. enable_order_hint equal to 0 indicates
+ *                     that tools based on order hints are disabled.
  * @order_hint_bits_minus_1: is used to compute OrderHintBits.
- * @seq_choose_screen_content_tools: equal to 0 indicates that the seq_force_screen_content_tools syntax element will be
- *                                   present. seq_choose_screen_content_tools equal to 1 indicates that seq_force_screen_content_tools
- *                                   should be set equal to SELECT_SCREEN_CONTENT_TOOLS.
- * @seq_force_screen_content_tools: equal to SELECT_SCREEN_CONTENT_TOOLS indicates that the allow_screen_content_tools syntax element
- *                                  will be present in the frame header. Otherwise, seq_force_screen_content_tools contains the value
- *                                  for allow_screen_content_tools.
- * @seq_choose_integer_mv: equal to 0 indicates that the seq_force_integer_mv syntax element will be present.seq_choose_integer_mv
- *                         equal to 1 indicates that seq_force_integer_mv should be set equal to SELECT_INTEGER_MV.
- * @seq_force_integer_mv: equal to SELECT_INTEGER_MV indicates that the force_integer_mv syntax element will be present in the frame
- *                        header (providing allow_screen_content_tools is equal to 1). Otherwise, seq_force_integer_mv contains the
- *                        value for force_integer_mv.
- * @operating_points_cnt_minus_1: indicates the number of operating points minus 1 present in this bitstream.
- * @operating_points[]: an array of #GstAV1OperatingPoint specifies the corresponding operating point for a set of operating parameters.
- * @decoder_model_info_present_flag: specifies whether the decoder model info is present in the bitstream.
- * @decoder_model_info: a #GstAV1DecoderModelInfo that holds information about the decoder model.
- * @timing_info_present_flag specifies whether timing info is present in the bitstream.
+ * @seq_choose_screen_content_tools: equal to 0 indicates that the
+ *                                   seq_force_screen_content_tools
+ *                                   syntax element will be
+ *                                   present. seq_choose_screen_content_tools
+ *                                   equal to 1 indicates that
+ *                                   seq_force_screen_content_tools
+ *                                   should be set equal to
+ *                                   #GST_AV1_SELECT_SCREEN_CONTENT_TOOLS.
+ * @seq_force_screen_content_tools: equal to
+ *                                  #GST_AV1_SELECT_SCREEN_CONTENT_TOOLS
+ *                                  indicates that the
+ *                                  allow_screen_content_tools syntax
+ *                                  element will be present in the
+ *                                  frame header. Otherwise,
+ *                                  seq_force_screen_content_tools
+ *                                  contains the value for
+ *                                  allow_screen_content_tools.
+ * @seq_choose_integer_mv: equal to 0 indicates that the
+ *                         @seq_force_integer_mv syntax element will be
+ *                         present. @seq_choose_integer_mv equal to 1
+ *                         indicates that seq_force_integer_mv should
+ *                         be set equal to #GST_AV1_SELECT_INTEGER_MV.
+ * @seq_force_integer_mv: equal to #GST_AV1_SELECT_INTEGER_MV
+ *                        indicates that the #force_integer_mv syntax
+ *                        element will be present in the frame header
+ *                        (providing allow_screen_content_tools is
+ *                        equal to 1). Otherwise,
+ *                        @seq_force_integer_mv contains the value for
+ *                        @force_integer_mv.
+ * @operating_points_cnt_minus_1: indicates the number of operating
+ * points minus 1 present in this bitstream.
+ * @operating_points: an array of #GstAV1OperatingPoint specifies the
+ * corresponding operating point for a set of operating parameters.
+ * @decoder_model_info_present_flag: specifies whether the decoder
+ * model info is present in the bitstream.
+ * @decoder_model_info: a #GstAV1DecoderModelInfo that holds
+ * information about the decoder model.
+ * @timing_info_present_flag: specifies whether timing info is present
+ * in the bitstream.
  * @timing_info: a #GstAV1TimingInfo that holds the timing information.
  * @color_config: a #GstAV1ColorConfig that holds the color configuration.
  */
@@ -764,11 +877,14 @@ struct _GstAV1SequenceHeaderOBU {
 
 /**
  * GstAV1MetadataITUT_T35:
- *
- * @itu_t_t35_country_code: shall be a byte having a value specified as a country code by Annex A of Recommendation ITU-T T.35.
- * @itu_t_t35_country_code_extension_byte: shall be a byte having a value specified as a country code by Annex B of
+ * @itu_t_t35_country_code: shall be a byte having a value specified
+ * as a country code by Annex A of Recommendation ITU-T T.35.
+ * @itu_t_t35_country_code_extension_byte: shall be a byte having a
+ *                                         value specified as a
+ *                                         country code by Annex B of
  *                                         Recommendation ITU-T T.35.
- * @itu_t_t35_payload_bytes: shall be bytes containing data registered as specified in Recommendation ITU-T T.35.
+ * @itu_t_t35_payload_bytes: shall be bytes containing data registered
+ * as specified in Recommendation ITU-T T.35.
  */
 struct _GstAV1MetadataITUT_T35 {
   guint8 itu_t_t35_country_code;
@@ -778,10 +894,10 @@ struct _GstAV1MetadataITUT_T35 {
 
 /**
  * GstAV1MetadataHdrCll:
- * high dynamic range content light level syntax metadata
- *
  * @max_cll: specifies the maximum content light level as specified in CEA-861.3, Appendix A.
  * @max_fall: specifies the maximum frame-average light level as specified in CEA-861.3, Appendix A.
+ *
+ * high dynamic range content light level syntax metadata
  */
 struct _GstAV1MetadataHdrCll {
   guint16 max_cll;
@@ -790,16 +906,24 @@ struct _GstAV1MetadataHdrCll {
 
 /**
  * GstAV1MetadataHdrCll:
- * high dynamic range mastering display color volume metadata
+ * @primary_chromaticity_x: specifies a 0.16 fixed-point X
+ *                          chromaticity coordinate as defined by CIE
+ *                          1931, where i = 0,1,2 specifies Red,
+ *                          Green, Blue respectively.
+ * @primary_chromaticity_y: specifies a 0.16 fixed-point Y
+ *                          chromaticity coordinate as defined by CIE
+ *                          1931, where i = 0,1,2 specifies Red,
+ *                          Green, Blue respectively.
+ * @white_point_chromaticity_x: specifies a 0.16 fixed-point white X
+ * chromaticity coordinate as defined by CIE 1931.
+ * @white_point_chromaticity_y: specifies a 0.16 fixed-point white Y
+ * chromaticity coordinate as defined by CIE 1931.
+ * @luminance_max: is a 24.8 fixed-point maximum luminance,
+ * represented in candelas per square meter.
+ * @luminance_min: is a 18.14 fixed-point minimum luminance,
+ * represented in candelas per square meter.
  *
- * @primary_chromaticity_x[]: specifies a 0.16 fixed-point X chromaticity coordinate as defined by CIE 1931, where i =
- *                            0,1,2 specifies Red, Green, Blue respectively.
- * @primary_chromaticity_y[]: specifies a 0.16 fixed-point Y chromaticity coordinate as defined by CIE 1931, where i =
- *                            0,1,2 specifies Red, Green, Blue respectively.
- * @white_point_chromaticity_x: specifies a 0.16 fixed-point white X chromaticity coordinate as defined by CIE 1931.
- * @white_point_chromaticity_y: specifies a 0.16 fixed-point white Y chromaticity coordinate as defined by CIE 1931.
- * @luminance_max: is a 24.8 fixed-point maximum luminance, represented in candelas per square meter.
- * @luminance_min: is a 18.14 fixed-point minimum luminance, represented in candelas per square meter.
+ * high dynamic range mastering display color volume metadata
  */
 struct _GstAV1MetadataHdrMdcv {
   guint16 primary_chromaticity_x[3];
@@ -812,50 +936,120 @@ struct _GstAV1MetadataHdrMdcv {
 
 /**
  * GstAV1MetadataScalability:
+ * @scalability_mode_idc: indicates the picture prediction structure
+ * of the bitstream.
+ * @spatial_layers_cnt_minus_1: indicates the number of spatial layers
+ * present in the video sequence minus one.
+ * @spatial_layer_description_present_flag: indicates when set to 1
+ *                                          that the
+ *                                          @spatial_layer_ref_id is
+ *                                          present for each of the
+ *                                          (@spatial_layers_cnt_minus_1
+ *                                          + 1) layers, or that it is
+ *                                          not present when set to 0.
+ * @spatial_layer_dimensions_present_flag: indicates when set to 1
+ *                                         that the
+ *                                         @spatial_layer_max_width and
+ *                                         @spatial_layer_max_height
+ *                                         parameters are present for
+ *                                         each of the
+ *                                         (@spatial_layers_cnt_minus_1
+ *                                         + 1) layers, or that it
+ *                                         they are not present when
+ *                                         set to 0.
+ * @temporal_group_description_present_flag: indicates when set to 1
+ *                                           that the temporal
+ *                                           dependency information is
+ *                                           present, or that it is
+ *                                           not when set to 0.
+ * @scalability_structure_reserved_3bits: must be set to zero and be
+ * ignored by decoders.
+ * @spatial_layer_max_width: specifies the maximum frame width for the
+ *                           frames with @spatial_id equal to i. This
+ *                           number must not be larger than
+ *                           @max_frame_width_minus_1 + 1.
+ * @spatial_layer_max_height: specifies the maximum frame height for
+ *                            the frames with spatial_id equal to
+ *                            i. This number must not be larger than
+ *                            @max_frame_height_minus_1 + 1.
+ * @spatial_layer_ref_id: specifies the @spatial_id value of the frame
+ *                        within the current temporal unit that the
+ *                        frame of layer i uses for reference. If no
+ *                        frame within the current temporal unit is
+ *                        used for reference the value must be equal
+ *                        to 255.
+ * @temporal_group_size: indicates the number of pictures in a
+ *                       temporal picture group. If the
+ *                       @temporal_group_size is greater than 0, then
+ *                       the scalability structure data allows the
+ *                       inter-picture temporal dependency structure
+ *                       of the video sequence to be specified. If the
+ *                       @temporal_group_size is greater than 0, then
+ *                       for @temporal_group_size pictures in the
+ *                       temporal group, each picture’s temporal layer
+ *                       id (@temporal_id), switch up points
+ *                       (@temporal_group_temporal_switching_up_point_flag
+ *                       and
+ *                       @temporal_group_spatial_switching_up_point_flag),
+ *                       and the reference picture indices
+ *                       (@temporal_group_ref_pic_diff) are specified.
+ *                       The first picture specified in a temporal
+ *                       group must have temporal_id equal to 0.  If
+ *                       the parameter @temporal_group_size is not
+ *                       present or set to 0, then either there is
+ *                       only one temporal layer or there is no fixed
+ *                       inter-picture temporal dependency present
+ *                       going forward in the video sequence.  Note
+ *                       that for a given picture, all frames follow
+ *                       the same inter-picture temporal dependency
+ *                       structure.  However, the frame rate of each
+ *                       layer can be different from each other. The
+ *                       specified dependency structure in the
+ *                       scalability structure data must be for the
+ *                       highest frame rate layer.
+ * @temporal_group_temporal_id: specifies the @temporal_id value for
+ * the i-th picture in the temporal group.
+ * @temporal_group_temporal_switching_up_point_flag: is set to 1 if
+ *                                                   subsequent (in
+ *                                                   decoding order)
+ *                                                   pictures with a
+ *                                                   @temporal_id
+ *                                                   higher than
+ *                                                   @temporal_group_temporal_id[i]
+ *                                                   do not depend on
+ *                                                   any picture
+ *                                                   preceding the
+ *                                                   current picture
+ *                                                   (in coding order)
+ *                                                   with @temporal_id
+ *                                                   higher than
+ *                                                   @temporal_group_temporal_id[i].
+ * @temporal_group_spatial_switching_up_point_flag: is set to 1 if
+ *                                                  spatial layers of
+ *                                                  the current
+ *                                                  picture in the
+ *                                                  temporal group
+ *                                                  (i.e., pictures
+ *                                                  with a @spatial_id
+ *                                                  higher than zero)
+ *                                                  do not depend on
+ *                                                  any picture
+ *                                                  preceding the
+ *                                                  current picture in
+ *                                                  the temporal
+ *                                                  group.
+ * @temporal_group_ref_cnt: indicates the number of reference pictures
+ * used by the i-th picture in the temporal group.
+ * @temporal_group_ref_pic_diff: indicates, for the i-th picture in
+ *                               the temporal group, the temporal
+ *                               distance between the i-th picture and
+ *                               the j-th reference picture used by
+ *                               the i-th picture. The temporal
+ *                               distance is measured in frames,
+ *                               counting only frames of identical
+ *                               @spatial_id values.
+ *
  * high dynamic range mastering display color volume metadata
- *
- * @scalability_mode_idc: indicates the picture prediction structure of the bitstream.
- * @spatial_layers_cnt_minus_1: indicates the number of spatial layers present in the video sequence minus one.
- * @spatial_layer_description_present_flag: indicates when set to 1 that the spatial_layer_ref_id is present for each of the
- *                                          (spatial_layers_cnt_minus_1 + 1) layers, or that it is not present when set to 0.
- * @spatial_layer_dimensions_present_flag: indicates when set to 1 that the spatial_layer_max_width and
- *                                         spatial_layer_max_height parameters are present for each of the
- *                                         (spatial_layers_cnt_minus_1 + 1) layers, or that it they are not present when set to 0.
- * @temporal_group_description_present_flag: indicates when set to 1 that the temporal dependency information is
- *                                           present, or that it is not when set to 0.
- *
- * @scalability_structure_reserved_3bits: must be set to zero and be ignored by decoders.
- * @spatial_layer_max_width[i]: specifies the maximum frame width for the frames with spatial_id equal to i. This number
- *                              must not be larger than max_frame_width_minus_1 + 1.
- * @spatial_layer_max_height[i]: specifies the maximum frame height for the frames with spatial_id equal to i. This number
- *                               must not be larger than max_frame_height_minus_1 + 1.
- * @spatial_layer_ref_id[i]: specifies the spatial_id value of the frame within the current temporal unit that the frame of layer i
- *                           uses for reference. If no frame within the current temporal unit is used for reference the value must
- *                           be equal to 255.
- * @temporal_group_size: indicates the number of pictures in a temporal picture group. If the temporal_group_size is greater
- *                       than 0, then the scalability structure data allows the inter-picture temporal dependency structure of
- *                       the video sequence to be specified. If the temporal_group_size is greater than 0, then for temporal_group_size
- *                       pictures in the temporal group, each picture’s temporal layer id (temporal_id), switch up points
- *                       (temporal_group_temporal_switching_up_point_flag and temporal_group_spatial_switching_up_point_flag), and the
- *                       reference picture indices (temporal_group_ref_pic_diff) are specified.
- *                       The first picture specified in a temporal group must have temporal_id equal to 0.
- *                       If the parameter temporal_group_size is not present or set to 0, then either there is only one temporal layer
- *                       or there is no fixed inter-picture temporal dependency present going forward in the video sequence.
- *                       Note that for a given picture, all frames follow the same inter-picture temporal dependency structure.
- *                       However, the frame rate of each layer can be different from each other. The specified dependency structure
- *                       in the scalability structure data must be for the highest frame rate layer.
- * @temporal_group_temporal_id[i]: specifies the temporal_id value for the i-th picture in the temporal group.
- * @temporal_group_temporal_switching_up_point_flag[i]: is set to 1 if subsequent (in decoding order) pictures with a temporal_id higher
- *                                                      than temporal_group_temporal_id[ i ] do not depend on any picture preceding the
- *                                                      current picture (in coding order) with temporal_id higher than
- *                                                      temporal_group_temporal_id[ i ].
- * @temporal_group_spatial_switching_up_point_flag[i]: is set to 1 if spatial layers of the current picture in the temporal group
- *                                                     (i.e., pictures with a spatial_id higher than zero) do not depend on any picture
- *                                                     preceding the current picture in the temporal group.
- * @temporal_group_ref_cnt[i]: indicates the number of reference pictures used by the i-th picture in the temporal group.
- * @temporal_group_ref_pic_diff[i][j]: indicates, for the i-th picture in the temporal group, the temporal distance between the i-th picture
- *                                     and the j-th reference picture used by the i-th picture. The temporal distance is measured in frames,
- *                                     counting only frames of identical spatial_id values.
  */
 struct _GstAV1MetadataScalability {
   GstAV1ScalabilityModes scalability_mode_idc;
@@ -879,47 +1073,87 @@ struct _GstAV1MetadataScalability {
 
 /**
  * GstAV1MetadataTimecode:
- * high dynamic range mastering display color volume metadata
- *
- * @counting_type: specifies the method of dropping values of the n_frames syntax element as specified in AV1 Spec 6.1.1.
- *                 counting_type should be the same for all pictures in the coded video sequence.
- * @full_timestamp_flag: equal to 1 indicates that the the seconds_value, minutes_value, hours_value syntax elements will be
- *                       present. full_timestamp_flag equal to 0 indicates that there are flags to control the presence of
- *                       these syntax elements.
- * @discontinuity_flag: equal to 0 indicates that the difference between the current value of clockTimestamp and the value of
- *                      clockTimestamp computed from the previous set of timestamp syntax elements in output order can be
- *                      interpreted as the time difference between the times of origin or capture of the associated frames or
- *                      fields. discontinuity_flag equal to 1 indicates that the difference between the current value of
- *                      clockTimestamp and the value of clockTimestamp computed from the previous set of clock timestamp syntax
- *                      elements in output order should not be interpreted as the time difference between the times of origin
- *                      or capture of the associated frames or fields.
- * @cnt_dropped_flag: specifies the skipping of one or more values of n_frames using the counting method specified by
+ * @counting_type: specifies the method of dropping values of the
+ *                 n_frames syntax element as specified in AV1 Spec
+ *                 6.1.1.  counting_type should be the same for all
+ *                 pictures in the coded video sequence.
+ * @full_timestamp_flag: equal to 1 indicates that the the
+ *                       seconds_value, minutes_value, hours_value
+ *                       syntax elements will be
+ *                       present. full_timestamp_flag equal to 0
+ *                       indicates that there are flags to control the
+ *                       presence of these syntax elements.
+ * @discontinuity_flag: equal to 0 indicates that the difference
+ *                      between the current value of clockTimestamp
+ *                      and the value of clockTimestamp computed from
+ *                      the previous set of timestamp syntax elements
+ *                      in output order can be interpreted as the time
+ *                      difference between the times of origin or
+ *                      capture of the associated frames or
+ *                      fields. discontinuity_flag equal to 1
+ *                      indicates that the difference between the
+ *                      current value of clockTimestamp and the value
+ *                      of clockTimestamp computed from the previous
+ *                      set of clock timestamp syntax elements in
+ *                      output order should not be interpreted as the
+ *                      time difference between the times of origin or
+ *                      capture of the associated frames or fields.
+ * @cnt_dropped_flag: specifies the skipping of one or more values of
+ *                    n_frames using the counting method specified by
  *                    counting_type.
- * @n_frames: is used to compute clockTimestamp. When timing_info_present_flag is equal to 1, n_frames shall be less than
- *            maxFps, where maxFps is specified by maxFps = ceil( time_scale / ( 2 * num_units_in_display_tick ) ).
- * @seconds_flag equal: to 1 specifies that seconds_value and minutes_flag are present when full_timestamp_flag is equal to
- *                      0. seconds_flag equal to 0 specifies that seconds_value and minutes_flag are not present.
- * @seconds_value: is used to compute clockTimestamp and shall be in the range of 0 to 59. When seconds_value is not
- *                 present, its value is inferred to be equal to the value of seconds_value for the previous set of clock
- *                 timestamp syntax elements in decoding order, and it is required that such a previous seconds_value shall
- *                 have been present.
- * @minutes_flag equal: to 1 specifies that minutes_value and hours_flag are present when full_timestamp_flag is equal to 0
- *                      and seconds_flag is equal to 1. minutes_flag equal to 0 specifies that minutes_value and hours_flag
- *                      are not present.
- * @minutes_value specifies: the value of mm used to compute clockTimestamp and shall be in the range of 0 to 59, inclusive.
- *                           When minutes_value is not present, its value is inferred to be equal to the value of minutes_value
- *                           for the previous set of clock timestamp syntax elements in decoding order, and it is required that
- *                           such a previous minutes_value shall have been present.
- * @hours_flag: equal to 1 specifies that hours_value is present when full_timestamp_flag is equal to 0 and seconds_flag is
- *              equal to 1 and minutes_flag is equal to 1.
- * @hours_value: is used to compute clockTimestamp and shall be in the range of 0 to 23, inclusive. When hours_value is not
- *               present, its value is inferred to be equal to the value of hours_value for the previous set of clock timestamp
- *               syntax elements in decoding order, and it is required that such a previous hours_value shall have been present.
- * @time_offset_length: greater than 0 specifies the length in bits of the time_offset_value syntax element. time_offset_length
- *                      equal to 0 specifies that the time_offset_value syntax element is not present. time_offset_length should
- *                      be the same for all pictures in the coded video sequence.
- * @time_offset_value: is used to compute clockTimestamp. The number of bits used to represent time_offset_value is equal to
- *                     time_offset_length. When time_offset_value is not present, its value is inferred to be equal to 0.
+ * @n_frames: is used to compute clockTimestamp. When
+ *            timing_info_present_flag is equal to 1, n_frames shall
+ *            be less than maxFps, where maxFps is specified by maxFps
+ *            = ceil( time_scale / ( 2 * num_units_in_display_tick )
+ *            ).
+ * @seconds_flag: equal to 1 specifies that seconds_value and
+ *                minutes_flag are present when @full_timestamp_flag is
+ *                equal to 0. @seconds_flag equal to 0 specifies that
+ *                @seconds_value and @minutes_flag are not present.
+ * @seconds_value: is used to compute clockTimestamp and shall be in
+ *                 the range of 0 to 59. When @seconds_value is not
+ *                 present, its value is inferred to be equal to the
+ *                 value of @seconds_value for the previous set of
+ *                 clock timestamp syntax elements in decoding order,
+ *                 and it is required that such a previous
+ *                 @seconds_value shall have been present.
+ * @minutes_flag: equal to 1 specifies that minutes_value and
+ *                hours_flag are present when @full_timestamp_flag is
+ *                equal to 0 and @seconds_flag is equal to
+ *                1. @minutes_flag equal to 0 specifies that
+ *                @minutes_value and @hours_flag are not present.
+ * @minutes_value: specifies the value of mm used to compute
+ *                 clockTimestamp and shall be in the range of 0 to
+ *                 59, inclusive.  When @minutes_value is not present,
+ *                 its value is inferred to be equal to the value of
+ *                 @minutes_value for the previous set of clock
+ *                 timestamp syntax elements in decoding order, and it
+ *                 is required that such a previous minutes_value
+ *                 shall have been present.
+ * @hours_flag: equal to 1 specifies that hours_value is present when
+ *              @full_timestamp_flag is equal to 0 and seconds_flag is
+ *              equal to 1 and @minutes_flag is equal to 1.
+ * @hours_value: is used to compute clockTimestamp and shall be in the
+ *               range of 0 to 23, inclusive. When @hours_value is not
+ *               present, its value is inferred to be equal to the
+ *               value of @hours_value for the previous set of clock
+ *               timestamp syntax elements in decoding order, and it
+ *               is required that such a previous @hours_value shall
+ *               have been present.
+ * @time_offset_length: greater than 0 specifies the length in bits of
+ *                      the @time_offset_value syntax
+ *                      element. @time_offset_length equal to 0
+ *                      specifies that the @time_offset_value syntax
+ *                      element is not present. @time_offset_length
+ *                      should be the same for all pictures in the
+ *                      coded video sequence.
+ * @time_offset_value: is used to compute clockTimestamp. The number
+ *                     of bits used to represent @time_offset_value is
+ *                     equal to @time_offset_length. When
+ *                     @time_offset_value is not present, its value is
+ *                     inferred to be equal to 0.
+ *
+ * high dynamic range mastering display color volume metadata
  */
 struct _GstAV1MetadataTimecode {
   guint8 counting_type; /* candidate for sperate Type GstAV1TimecodeCountingType */
@@ -939,7 +1173,6 @@ struct _GstAV1MetadataTimecode {
 
 /**
  * GstAV1MetadataOBU:
- *
  * @metadata_type: type of metadata
  * @itut_t35: ITUT T35 metadata
  * @hdrcll: high dynamic range content light level metadata
@@ -960,8 +1193,7 @@ struct _GstAV1MetadataOBU {
 
 /**
  * GstAV1LoopFilterParams:
- *
- * @loop_filter_level[]: is an array containing loop filter strength values. Different loop filter strength values
+ * @loop_filter_level: is an array containing loop filter strength values. Different loop filter strength values
  *                       from the array are used depending on the image plane being filtered, and the edge direction
  *                       (vertical or horizontal) being filtered.
  * @loop_filter_sharpness: indicates the sharpness level. The loop_filter_level and loop_filter_sharpness together
@@ -973,16 +1205,16 @@ struct _GstAV1MetadataOBU {
  * @loop_filter_delta_update: equal to 1 means that the bitstream contains additional syntax elements that specify which
  *                            mode and reference frame deltas are to be updated. loop_filter_delta_update equal to 0
  *                            means that these syntax elements are not present
- * @update_ref_delta[]: equal to 1 means that the bitstream contains the syntax element loop_filter_ref_delta;
+ * @update_ref_delta: equal to 1 means that the bitstream contains the syntax element loop_filter_ref_delta;
  *                      update_ref_delta equal to 0 means that the bitstream does not contain this syntax element.
- * @loop_filter_ref_deltas[]: contains the adjustment needed for the filter level based on the chosen reference frame.
+ * @loop_filter_ref_deltas: contains the adjustment needed for the filter level based on the chosen reference frame.
  *                            If this syntax element is not present in the bitstream, it maintains its previous value.
- * @update_mode_delta[]: equal to 1 means that the bitstream contains the syntax element loop_filter_mode_deltas;
+ * @update_mode_delta: equal to 1 means that the bitstream contains the syntax element loop_filter_mode_deltas;
  *                       update_mode_delta equal to 0 means that the bitstream does not contain this syntax element.
- * @loop_filter_mode_deltas[]: contains the adjustment needed for the filter level based on the chosen mode. If this syntax
+ * @loop_filter_mode_deltas: contains the adjustment needed for the filter level based on the chosen mode. If this syntax
  *                             element is not present in the bitstream, it maintains its previous value.
  * --- includes Loop filter delta parameters:
- * @delta_lf_present specifies whether loop filter delta values are present in the bitstream.
+ * @delta_lf_present: specifies whether loop filter delta values are present in the bitstream.
  * @delta_lf_res: specifies the left shift which should be applied to decoded loop filter delta values.
  * @delta_lf_multi: equal to 1 specifies that separate loop filter deltas are sent for horizontal luma edges, vertical luma
  *                  edges, the U edges, and the V edges. delta_lf_multi equal to 0 specifies that the same loop filter delta
@@ -1007,7 +1239,6 @@ struct _GstAV1LoopFilterParams {
 
 /**
  * GstAV1QuantizationParams:
- *
  * @base_q_idx: indicates the base frame qindex. This is used for Y AC coefficients and as the base value for
  *              the other quantizers.
  * @delta_q_ydc: indicates the Y DC quantizer relative to base_q_idx.
@@ -1042,7 +1273,6 @@ struct _GstAV1QuantizationParams {
 
 /**
  * GstAV1SegmenationParams:
- *
  * @segmentation_enabled: equal to 1 indicates that this frame makes use of the segmentation tool;
  *                        segmentation_enabled equal to 0 indicates that the frame does not use segmentation.
  * @segmentation_update_map: equal to 1 indicates that the segmentation map are updated during the decoding
@@ -1054,9 +1284,9 @@ struct _GstAV1QuantizationParams {
  * @segmentation_update_data: equal to 1 indicates that new parameters are about to be specified for each segment.
  *                            segmentation_update_data equal to 0 indicates that the segmentation parameters should keep
  *                            their existing values.
- * @feature_enabled[]: equal to 0 indicates that the corresponding feature is unused and has value equal to 0.
+ * @feature_enabled: equal to 0 indicates that the corresponding feature is unused and has value equal to 0.
  *                    feature_enabled[] equal to 1 indicates that the feature value is coded in the bitstream.
- * @feature_data[]: specifies the feature data for a segment feature.
+ * @feature_data: specifies the feature data for a segment feature.
  * @seg_id_preskip: equal to 1 indicates that the segment id will be read before the skip syntax element. seg_id_preskip
  *                equal to 0 indicates that the skip syntax element will be read first.
  * @last_active_seg_id: indicates the highest numbered segment id that has some enabled feature. This is used when decoding
@@ -1082,17 +1312,18 @@ struct _GstAV1SegmenationParams {
  * @tile_rows_log2: specifies the base 2 logarithm of the desired number of tiles down the frame.
  * @tile_rows: specifies the number of tiles down the frame. It is a requirement of bitstream conformance that TileRows is
  *            less than or equal to MAX_TILE_ROWS.
- * @mi_col_starts[]: is an array specifying the start column (in units of 4x4 luma samples) for each tile across the image.
+ * @mi_col_starts: is an array specifying the start column (in units of 4x4 luma samples) for each tile across the image.
  *                 If uniform_tile_spacing_flag is equal to 0, it is a requirement of bitstream conformance that startSb is equal
  *                 to sbCols when the loop writing mi_col_starts exits.
- * @mi_row_starts[]: is an array specifying the start row (in units of 4x4 luma samples) for each tile down the image.
+ * @mi_row_starts: is an array specifying the start row (in units of 4x4 luma samples) for each tile down the image.
  *                 If uniform_tile_spacing_flag is equal to 0, it is a requirement of bitstream conformance that startSb is equal
  *                 to sbRows when the loop writing mi_row_starts exits.
 
  * @context_update_tile_id: specifies which tile to use for the CDF update.
  * @tile_size_bytes specifies the number of bytes needed to code each tile size.
  */
- /*
+
+/*
  * @width_in_sbs_minus_1[]: specifies the width of a tile minus 1 in units of superblocks.
  * @tileWidthSb[]: is used to specify the width of each tile in units of superblocks. It is a requirement of bitstream conformance
  *                 that tileWidthSb is less than maxTileWidthSb.
@@ -1110,12 +1341,11 @@ struct _GstAV1TileInfo {
   guint32 mi_row_starts[GST_AV1_MAX_TILE_COUNT];
   guint16 context_update_tile_id;
   guint8 tile_size_bytes;
-  /*
-  guint32 width_in_sbs_minus_1[GST_AV1_MAX_TILE_COUNT;
-  guint32 tileWidthSb[GST_AV1_MAX_TILE_COUNT];
-  guint32 height_in_sbs_minus_1[GST_AV1_MAX_TILE_COUNT];
-  guint32 tileHeightSb[GST_AV1_MAX_TILE_COUNT];
-  */
+  /*< private >*/
+  /* guint32 width_in_sbs_minus_1[GST_AV1_MAX_TILE_COUNT; */
+  /* guint32 tileWidthSb[GST_AV1_MAX_TILE_COUNT]; */
+  /* guint32 height_in_sbs_minus_1[GST_AV1_MAX_TILE_COUNT]; */
+  /* guint32 tileHeightSb[GST_AV1_MAX_TILE_COUNT]; */
 };
 
 /**
@@ -1138,7 +1368,6 @@ struct _GstAV1CDEFParams {
 
 /**
  * GstAV1LoopRestorationParams:
- *
  * @lr_unit_shift: specifies if the luma restoration size should be halved.
  * @lr_unit_extra_shift: specifies if the luma restoration size should be halved again.
  * @lr_uv_shift: is only present for 4:2:0 formats and specifies if the chroma size should be half the luma size.
@@ -1160,7 +1389,6 @@ struct _GstAV1LoopRestorationParams {
 
 /**
  * GstAV1GlobalMotionParams:
- *
  * @is_global: specifies whether global motion parameters are present for a particular reference frame.
  * @is_rot_zoom: specifies whether a particular reference frame uses rotation and zoom global motion.
  * @is_translation: specifies whether a particular reference frame uses translation global motion.
@@ -1176,76 +1404,122 @@ struct _GstAV1GlobalMotionParams {
 
 /**
  * GstAV1FilmGrainParams:
- *
- * @apply_grain: equal to 1 specifies that film grain should be added to this frame. apply_grain equal to 0
- *               specifies that film grain should not be added.
- * @grain_seed: specifies the starting value for the pseudo-random numbers used during film grain synthesis.
- * @update_grain: equal to 1 means that a new set of parameters should be sent. update_grain equal to 0 means
- *                that the previous set of parameters should be used.
- * @film_grain_params_ref_idx: indicates which reference frame contains the film grain parameters to be used
- *                             for this frame.
- * @num_y_points: specifies the number of points for the piece-wise linear scaling function of the luma component.
- *                It is a requirement of bitstream conformance that num_y_points is less than or equal to 14.
- * @point_y_value[i]: represents the x (luma value) coordinate for the i-th point of the piecewise linear scaling
- *                    function for luma component. The values are signaled on the scale of 0..255. (In case of 10
- *                    bit video, these values correspond to luma values divided by 4. In case of 12 bit video,
- *                    these values correspond to luma values divided by 16.) If i is greater than 0, it is a r
- *                    equirement of bitstream conformance that point_y_value[ i ] is greater than
- *                    point_y_value[ i - 1 ] (this ensures the x coordinates are specified in increasing order).
- * @point_y_scaling[i]: represents the scaling (output) value for the i-th point of the piecewise linear scaling
- *                      function for luma component. chroma_scaling_from_luma specifies that the chroma scaling
- *                      is inferred from the luma scaling.
- * @num_cb_points: specifies the number of points for the piece-wise linear scaling function of the cb component.
- *                 It is a requirement of bitstream conformance that num_cb_points is less than or equal to 10.
- * @point_cb_value[i]: represents the x coordinate for the i-th point of the piece-wise linear scaling function
- *                     for cb component. The values are signaled on the scale of 0..255. If i is greater than 0,
- *                     it is a requirement of bitstream conformance that point_cb_value[ i ] is greater than
- *                     point_cb_value[ i - 1 ].
- * @point_cb_scaling[i]: represents the scaling (output) value for the i-th point of the piecewise linear scaling
- *                       function for cb component.
- * @num_cr_points: specifies represents the number of points for the piece-wise linear scaling function of the cr
- *                 component.
- *                 It is a requirement of bitstream conformance that num_cr_points is less than or equal to 10.
- *                 If subsampling_x is equal to 1 and subsampling_y is equal to 1 and num_cb_points is equal to 0,
- *                 it is a requirement of bitstream conformance that num_cr_points is equal to 0.
- *                 If subsampling_x is equal to 1 and subsampling_y is equal to 1 and num_cb_points is not equal
- *                 to 0, it is a requirement of bitstream conformance that num_cr_points is not equal to 0.
- *
- * @point_cr_value[i]: represents the x coordinate for the i-th point of the piece-wise linear scaling function for
- *                     cr component. The values are signaled on the scale of 0..255. If i is greater than 0, it is a
- *                     requirement of bitstream conformance that point_cr_value[ i ] is greater than
- *                     point_cr_value[ i - 1 ].
- * @point_cr_scaling[i]: represents the scaling (output) value for the i-th point of the piecewise linear scaling
- *                       function for cr component.
- * @grain_scaling_minus_8: represents the shift – 8 applied to the values of the chroma component. The
- *                         grain_scaling_minus_8 can take values of 0..3 and determines the range and quantization
- *                         step of the standard deviation of film grain.
+ * @apply_grain: equal to 1 specifies that film grain should be added
+ *               to this frame. apply_grain equal to 0 specifies that
+ *               film grain should not be added.
+ * @grain_seed: specifies the starting value for the pseudo-random
+ * numbers used during film grain synthesis.
+ * @update_grain: equal to 1 means that a new set of parameters should
+ *                be sent. update_grain equal to 0 means that the
+ *                previous set of parameters should be used.
+ * @film_grain_params_ref_idx: indicates which reference frame
+ *                             contains the film grain parameters to
+ *                             be used for this frame.
+ * @num_y_points: specifies the number of points for the piece-wise
+ *                linear scaling function of the luma component.  It
+ *                is a requirement of bitstream conformance that
+ *                num_y_points is less than or equal to 14.
+ * @point_y_value: represents the x (luma value) coordinate for the
+ *                 i-th point of the piecewise linear scaling function
+ *                 for luma component. The values are signaled on the
+ *                 scale of 0..255. (In case of 10 bit video, these
+ *                 values correspond to luma values divided by 4. In
+ *                 case of 12 bit video, these values correspond to
+ *                 luma values divided by 16.) If i is greater than 0,
+ *                 it is a r equirement of bitstream conformance that
+ *                 @point_y_value[i] is greater than
+ *                 @point_y_value[i-1] (this ensures the x coordinates
+ *                 are specified in increasing order).
+ * @point_y_scaling: represents the scaling (output) value for the
+ *                   i-th point of the piecewise linear scaling
+ *                   function for luma component.
+ *                   @chroma_scaling_from_luma specifies that the
+ *                   chroma scaling is inferred from the luma scaling.
+ * @num_cb_points: specifies the number of points for the piece-wise
+ *                 linear scaling function of the cb component.  It is
+ *                 a requirement of bitstream conformance that
+ *                 num_cb_points is less than or equal to 10.
+ * @point_cb_value: represents the x coordinate for the i-th point of
+ *                     the piece-wise linear scaling function for cb
+ *                     component. The values are signaled on the scale
+ *                     of 0..255. If i is greater than 0, it is a
+ *                     requirement of bitstream conformance that
+ *                     @point_cb_value[i] is greater than
+ *                     @point_cb_value[i-1].
+ * @point_cb_scaling: represents the scaling (output) value for the
+ *                    i-th point of the piecewise linear scaling
+ *                    function for cb component.
+ * @num_cr_points: specifies represents the number of points for the
+ *                 piece-wise linear scaling function of the cr
+ *                 component.  It is a requirement of bitstream
+ *                 conformance that @num_cr_points is less than or
+ *                 equal to 10.  If @subsampling_x is equal to 1 and
+ *                 @subsampling_y is equal to 1 and @num_cb_points is
+ *                 equal to 0, it is a requirement of bitstream
+ *                 conformance that @num_cr_points is equal to 0.  If
+ *                 @subsampling_x is equal to 1 and @subsampling_y is
+ *                 equal to 1 and @num_cb_points is not equal to 0, it
+ *                 is a requirement of bitstream conformance that
+ *                 @num_cr_points is not equal to 0.
+ * @point_cr_value: represents the x coordinate for the i-th point of
+ *                  the piece-wise linear scaling function for cr
+ *                  component. The values are signaled on the scale of
+ *                  0..255. If i is greater than 0, it is a
+ *                  requirement of bitstream conformance that
+ *                  @point_cr_value[i] is greater than
+ *                  @point_cr_value[i-1].
+ * @point_cr_scaling: represents the scaling (output) value for the
+ *                    i-th point of the piecewise linear scaling
+ *                    function for cr component.
+ * @grain_scaling_minus_8: represents the shift – 8 applied to the
+ *                         values of the chroma component. The
+ *                         @grain_scaling_minus_8 can take values of
+ *                         0..3 and determines the range and
+ *                         quantization step of the standard deviation
+ *                         of film grain.
  * @ar_coeff_lag: specifies the number of auto-regressive coefficients for luma and chroma.
- * @ar_coeffs_y_plus_128[i]: specifies auto-regressive coefficients used for the Y plane.
- * @ar_coeffs_cb_plus_128[i]: specifies auto-regressive coefficients used for the U plane.
- * @ar_coeffs_cr_plus_128[i]: specifies auto-regressive coefficients used for the V plane.
- * @ar_coeff_shift_minus_6: specifies the range of the auto-regressive coefficients. Values of 0, 1, 2, and 3
- *                          correspond to the ranges for auto-regressive coefficients of [-2, 2), [-1, 1),
- *                          [-0.5, 0.5) and [-0.25, 0.25) respectively.
- * @grain_scale_shift: specifies how much the Gaussian random numbers should be scaled down during the grain
+ * @ar_coeffs_y_plus_128: specifies auto-regressive coefficients used for the Y plane.
+ * @ar_coeffs_cb_plus_128: specifies auto-regressive coefficients used for the U plane.
+ * @ar_coeffs_cr_plus_128: specifies auto-regressive coefficients used for the V plane.
+ * @ar_coeff_shift_minus_6: specifies the range of the auto-regressive
+ *                          coefficients. Values of 0, 1, 2, and 3
+ *                          correspond to the ranges for
+ *                          auto-regressive coefficients of [-2, 2),
+ *                          [-1, 1), [-0.5, 0.5) and [-0.25, 0.25)
+ *                          respectively.
+ * @grain_scale_shift: specifies how much the Gaussian random numbers
+ *                     should be scaled down during the grain
  *                     synthesis process.
- * @cb_mult: represents a multiplier for the cb component used in derivation of the input index to the cb component
- *           scaling function.
- * @cb_luma_mult: represents a multiplier for the average luma component used in derivation of the input index to
+ * @cb_mult: represents a multiplier for the cb component used in
+ *           derivation of the input index to the cb component scaling
+ *           function.
+ * @cb_luma_mult: represents a multiplier for the average luma
+ *                component used in derivation of the input index to
  *                the cb component scaling function.
- * @cb_offset: represents an offset used in derivation of the input index to the cb component scaling function.
- * @cr_mult: represents a multiplier for the cr component used in derivation of the input index to the cr component
- *           scaling function.
- * @cr_luma_mult: represents a multiplier for the average luma component used in derivation of the input index to
+ * @cb_offset: represents an offset used in derivation of the input
+ * index to the cb component scaling function.
+ * @cr_mult: represents a multiplier for the cr component used in
+ *           derivation of the input index to the cr component scaling
+ *           function.
+ * @cr_luma_mult: represents a multiplier for the average luma
+ *                component used in derivation of the input index to
  *                the cr component scaling function.
- * @cr_offset: represents an offset used in derivation of the input index to the cr component scaling function.
- * @overlap_flag: equal to 1 indicates that the overlap between film grain blocks shall be applied. overlap_flag
- *                equal to 0 indicates that the overlap between film grain blocks shall not be applied.
- * @clip_to_restricted_range: equal to 1 indicates that clipping to the restricted (studio) range shall be applied
- *                            to the sample values after adding the film grain (see the semantics for color_range
- *                            for an explanation of studio swing).
- *                            clip_to_restricted_range equal to 0 indicates that clipping to the full range shall
- *                            be applied to the sample values after adding the film grain.
+ * @cr_offset: represents an offset used in derivation of the input
+ * index to the cr component scaling function.
+ * @overlap_flag: equal to 1 indicates that the overlap between film
+ *                grain blocks shall be applied. @overlap_flag equal to
+ *                0 indicates that the overlap between film grain
+ *                blocks shall not be applied.
+ * @clip_to_restricted_range: equal to 1 indicates that clipping to
+ *                            the restricted (studio) range shall be
+ *                            applied to the sample values after
+ *                            adding the film grain (see the semantics
+ *                            for color_range for an explanation of
+ *                            studio swing).  clip_to_restricted_range
+ *                            equal to 0 indicates that clipping to
+ *                            the full range shall be applied to the
+ *                            sample values after adding the film
+ *                            grain.
  */
 struct _GstAV1FilmGrainParams {
   gboolean apply_grain;
@@ -1281,7 +1555,6 @@ struct _GstAV1FilmGrainParams {
 
 /**
  * GstAV1FrameHeaderOBU:
- *
  * @frame_type: specifies the type of the frame.
  * @show_existing_frame: equal to 1, indicates the frame indexed by frame_to_show_map_idx is to be output;
  *                       show_existing_frame equal to 0 indicates that further processing is required.
@@ -1367,14 +1640,14 @@ struct _GstAV1FilmGrainParams {
  * @buffer_removal_time_present_flag: equal to 1 specifies that buffer_removal_time is present in the bitstream.
  *                                    buffer_removal_time_present_flag equal to 0 specifies that buffer_removal_time is not present
  *                                    in the bitstream.
- * @buffer_removal_time[]: specifies the frame removal time in units of DecCT clock ticks counted from the removal time of the last
+ * @buffer_removal_time: specifies the frame removal time in units of DecCT clock ticks counted from the removal time of the last
  *                         frame with frame_type equal to KEY_FRAME for operating point opNum. buffer_removal_time is signaled as a
  *                         fixed length unsigned integer with a length in bits given by buffer_removal_time_length_minus_1 + 1.
  *                         buffer_removal_time is the remainder of a modulo 1 << ( buffer_removal_time_length_minus_1 + 1 ) counter.
  * @skip_mode_allowed: indicates if skip mode usage is allowed
  * @skip_mode_present: equal to 1 specifies that the syntax element skip_mode will be coded in the bitstream.
  *                     skip_mode_present equal to 0 specifies that skip_mode will not be used for this frame.
- * @skip_mode_frame[]: specifies the frames to use for compound prediction when skip_mode_present is equal to 1.
+ * @skip_mode_frame: specifies the frames to use for compound prediction when skip_mode_present is equal to 1.
  * @frame_width_minus_1: plus one is the width of the frame in luma samples.
  *                       It is a requirement of bitstream conformance that frame_width_minus_1 is less than or equal to
  *                       max_frame_width_minus_1. Used only if frame width is not derived from sequence header
@@ -1406,20 +1679,20 @@ struct _GstAV1FilmGrainParams {
  *                     start of the frame.
  * @last_frame_idx: specifies the reference frame to use for LAST_FRAME.
  * @gold_frame_idx: specifies the reference frame to use for GOLDEN_FRAME.
- * @ref_order_hint[]: specifies the expected output order hint for each reference buffer.
- * @ref_frame_idx[]: specifies which reference frames are used by inter frames. It is a requirement of bitstream conformance
+ * @ref_order_hint: specifies the expected output order hint for each reference buffer.
+ * @ref_frame_idx: specifies which reference frames are used by inter frames. It is a requirement of bitstream conformance
  *                   that RefValid[ ref_frame_idx[ i ] ] is equal to 1, and that the selected reference frames match the current
  *                   frame in bit depth, profile, chroma subsampling, and color space.
  * @expected_frame_id: specifies the frame id for each frame used for reference. It is a requirement of bitstream conformance
  *                     that whenever expectedFrameId[ i ] is calculated, the value matches RefFrameId[ ref_frame_idx[ i ] ] (this
  *                     contains the value of current_frame_id at the time that the frame indexed by ref_frame_idx was stored).
- * @order_hints[]: specifies the expected output order for each reference frame.
- * @ref_frame_sign_bias[]: specifies the intended direction of the motion vector in time for each reference frame. A sign bias
+ * @order_hints: specifies the expected output order for each reference frame.
+ * @ref_frame_sign_bias: specifies the intended direction of the motion vector in time for each reference frame. A sign bias
  *                      equal to 0 indicates that the reference frame is a forwards reference (i.e. the reference frame is expected
  *                      to be output before the current frame); a sign bias equal to 1 indicates that the reference frame is a backwards
  *                      reference.
- * @lossless_array[]: lossless array ??
- * @seg_qm_level[][]: Seq qm level ??
+ * @lossless_array: lossless array ??
+ * @seg_qm_level: Seq qm level ??
  * @interpolation_filter: a #GstAV1InterpolationFilter that specifies the filter selection used for performing inter prediction.
  * @tx_mode: specifies transformation mode
  * @film_grain_params: a #GstAV1FilmGrainParams holding the Film Grain parameters.
@@ -1520,21 +1793,20 @@ struct _GstAV1FrameHeaderOBU {
 
 /**
  * GstAV1ReferenceFrameInfo:
- *
- * @entry[].ref_valid: is Refernce Frame Valid
- * @entry[].ref_frame_id: Frame Id of reference Frame
- * @entry[].ref_frame_type: Reference Frame Type
- * @entry[].ref_upscaled_width: Upscaled Width of Reference Frame
- * @entry[].ref_frame_height: Frame Height of Reference Frame
- * @entry[].ref_frame_width: Frame Width of Reference Frame
- * @entry[].ref_render_height: Render Height of Reference Frame
- * @entry[].ref_render_width: Render Width of Reference Frame
- * @entry[].ref_order_hint: Reference Frame order hint
- * @entry[].ref_mi_cols: Number of mi Coloumns
- * @entry[].ref_mi_rows; Number of mi Rows
- * @entry[].ref_bit_depth: Bit Depth of refernce Frame
- * @entry[].ref_subsampling_x; the chroma subsampling x format
- * @entry[].ref_subsampling_y; the chroma subsampling y format
+ * @ref_valid: is Refernce Frame Valid
+ * @ref_frame_id: Frame Id of reference Frame
+ * @ref_frame_type: Reference Frame Type
+ * @ref_upscaled_width: Upscaled Width of Reference Frame
+ * @ref_frame_height: Frame Height of Reference Frame
+ * @ref_frame_width: Frame Width of Reference Frame
+ * @ref_render_height: Render Height of Reference Frame
+ * @ref_render_width: Render Width of Reference Frame
+ * @ref_order_hint: Reference Frame order hint
+ * @ref_mi_cols: Number of mi Coloumns
+ * @ref_mi_rows; Number of mi Rows
+ * @ref_bit_depth: Bit Depth of refernce Frame
+ * @ref_subsampling_x; the chroma subsampling x format
+ * @ref_subsampling_y; the chroma subsampling y format
  *
  * Note: The Reference Info is only partly implemented - check chapter 7.20 and 7.21 of Spec
  */
@@ -1557,10 +1829,8 @@ struct _GstAV1ReferenceFrameInfo {
   } entry[GST_AV1_REFS_PER_FRAME];
 };
 
-
 /**
  * GstAV1TileListOBU:
- *
  * @output_frame_width_in_tiles_minus_1: plus one is the width of the output frame, in tile units.
  * @output_frame_height_in_tiles_minus_1: plus one is the height of the output frame, in tile units.
  * @tile_count_minus_1: plus one is the number of tile_list_entry in the list.
@@ -1594,8 +1864,6 @@ struct _GstAV1TileListOBU {
 
 /**
  * GstAV1TileGroupOBU:
- *
- *
  * @num_tiles: specifies the total number of tiles in the frame.
  * @tile_start_and_end_present_flag: specifies whether tg_start and tg_end are present in the bitstream.
  *                                   If tg_start and tg_end are not present in the bitstream, this tile group covers the
@@ -1608,14 +1876,14 @@ struct _GstAV1TileListOBU {
  *          It is a requirement of bitstream conformance that the value of tg_end is greater than or equal to tg_start.
  *          It is a requirement of bitstream conformance that the value of tg_end for the last tile group in each frame is equal to
  *          num_tiles-1.
- * @entry[].tile_row: row coordinate of tile
- * @entry[].tile_col: column coordinate of tile
- * @entry[].tile_size: specifies the size in bytes of the next coded tile.
- * @entry[].mi_row_start: start position in mi rows
- * @entry[].mi_row_end: end position in mi rows
- * @entry[].mi_col_start: start position in mi cols
- * @entry[].mi_col_end: end position in mi cols
- * @entry[].current_q_index current q index:
+ * @tile_row: row coordinate of tile
+ * @tile_col: column coordinate of tile
+ * @tile_size: specifies the size in bytes of the next coded tile.
+ * @mi_row_start: start position in mi rows
+ * @mi_row_end: end position in mi rows
+ * @mi_col_start: start position in mi cols
+ * @mi_col_end: end position in mi cols
+ * @current_q_index current q index:
  */
 struct _GstAV1TileGroupOBU {
   guint32 num_tiles;
@@ -1636,7 +1904,6 @@ struct _GstAV1TileGroupOBU {
 
 /**
  * GstAV1FrameOBU:
- *
  * @frame_header: a #GstAV1FrameHeaderOBU holding frame_header data.
  * @tile_group: a #GstAV1TileGroupOBU holding tile_group data.
  */
@@ -1647,7 +1914,6 @@ struct _GstAV1FrameOBU {
 
 /**
  * GstAV1Parser:
- *
  * @priv: Private Parser data.
  * @use_annexb: true when parser should work in Annex B mode, false for low overhead bitstream formats.
  * @annexb.temporal_unit_size: size of the currently processed temporal unit.
@@ -1672,8 +1938,6 @@ struct _GstAV1Parser {
   GstAV1SequenceHeaderOBU *seq_header;
   GstAV1FrameHeaderOBU *frame_header;
 };
-
-
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_get_first_obu (GstAV1Parser * parser, const guint8 * data, gsize offset, gsize size, GstAV1OBU * obu);
@@ -1704,7 +1968,6 @@ GstAV1ParserResult gst_av1_parse_frame_header_obu (GstAV1Parser * parser, GstAV1
 
 GST_CODEC_PARSERS_API
 GstAV1ParserResult gst_av1_parse_frame_obu (GstAV1Parser * parser, GstAV1OBU * obu, GstAV1FrameOBU * frame);
-
 
 GST_CODEC_PARSERS_API
 GstAV1Parser *     gst_av1_parser_new (gboolean use_annexb);

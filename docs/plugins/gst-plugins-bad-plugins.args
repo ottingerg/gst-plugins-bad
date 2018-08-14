@@ -73170,3 +73170,13 @@ Gestures in the defined region of interest will emit messages.</BLURB>
 <DEFAULT>NULL</DEFAULT>
 </ARG>
 
+<ARG>
+<NAME>GstAV1Enc::cpu-used</NAME>
+<TYPE>gint</TYPE>
+<RANGE>[0,8]</RANGE>
+<FLAGS>rw</FLAGS>
+<NICK>CPU Used</NICK>
+<BLURB>CPU Used. A Value greater than 0 will increase encoder speed at the expense of quality.</BLURB>
+<DEFAULT>0</DEFAULT>
+</ARG>
+

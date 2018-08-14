@@ -1,5 +1,6 @@
 .dirstamp
 aggregator
+av1parser
 h264parser
 h265parser
 isoff
